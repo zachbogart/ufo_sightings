@@ -26,6 +26,13 @@ ufo <- read_csv("ufo_data.csv")
 
 ## Clean Data
 
+Let's format `Posted` as a Date
+```{r}
+# Posted
+
+ufo2$Posted <- as.Date(ufo2$Posted, format = "%m/%d/%y")
+```
+
 Let's clean the `Shape` column. 
 ```{r}
 # clean Shape
@@ -120,21 +127,28 @@ duration_clean_first_pass <- function(value) {
       } else if (times[2] %in% c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
                                  "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
                                  "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
-                                 "muntes", "minutue")) {
+                                 "muntes", "minutue", "minets")) {
         result <- as.numeric(times[1]) * 60
       } else if (times[2] %in% c("hour", "hours", "H", "h", "hrs", "hrs.", "hr", "hpurs")) {
         result <- as.numeric(times[1]) * 3600
+      } else if (times[2] %in% c("day", "days")) {
+        result <- as.numeric(times[1]) * 86400
+      } else if (times[2] %in% c("week", "weeks")) {
+        result <- as.numeric(times[1]) * 604800
+      } else if (times[2] %in% c("night", "nights")) {
+        result <- as.numeric(times[1]) * 28800 # assume "night" is 8 hours
       } else {
         result <- paste(times, collapse = " ")
       }
-    } else if (value %in% c("hour", "hours")) {
+    } else if (value %in% c("hour", "hours", "hr")) {
         result <- 3600 # if "hour", make 3600 seconds
-    } else if (value %in% c("short", "brief", "minute", "minutes", "minets")) {
+    } else if (value %in% c("short", "brief", "minute", "minutes", "minets", "less than 1 minute", "less than a minute")) {
         result <- 60 # if "short", make 1 minute
     } else if (value %in% c("seconds", "few seconds", "a few seconds")) {
         result <- 10 # if "seconds", make 10 seconds
     } else if (value %in% c("unknown", "?", "???", "not known", "unkn", "don't know", "unk", 
-                            "don't remember", "unsure", "not sure", "uncertain", "unknow", "not given")) {
+                            "don't remember", "unsure", "not sure", "uncertain", "unknow", "not given",
+                            "unclear")) {
         result <- NA
     } else {
       result <- paste(times, collapse = " ")
@@ -149,6 +163,7 @@ duration_clean_first_pass <- function(value) {
 ufo2$Duration_Cleaned <- lapply(ufo2$Duration_Raw, duration_clean_first_pass)
 ```
 
+To see how we are doing, let's see how many new NAs are introduced
 ```{r}
 ufo2$Duration_Testing <- ufo2$Duration_Cleaned
 
@@ -160,31 +175,18 @@ cat(" After: ", sum(is.na(ufo2$Duration_Testing)))
 
 ```
 
-Let's format `Posted` as a Date
 ```{r}
-# Posted
+duration <- ufo2$Duration_Testing[!is.na(ufo2$Duration_Testing)]
 
-ufo2$Posted <- as.Date(ufo2$Posted, format = "%m/%d/%y")
+summary(duration)
+
+str(unique(ufo2$Duration_Cleaned))
 ```
 
 
-```{r}
-# Date/Time
-
-# ufo2$
-# 
-# ufo2 <- ufo2 %>%
-#   separate(`Date / Time`, c("Date", "Time"), sep = " ")
-# 
-# ufo2$Date <- as.Date(ufo2$Date, format = "%m/%d/%y")
 
 
-```
 
-
-```{r}
-
-```
 
 
 
