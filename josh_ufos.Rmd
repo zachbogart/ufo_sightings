@@ -1,0 +1,363 @@
+---
+title: "josh_ufos"
+author: Josh Feldman (jbf2159)
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+# library(GGally)
+library(DAAG)
+# library(car)
+library(vcd)
+# library(tidyquant)
+# library(ggmosaic)
+```
+
+```{r}
+ufo <- as_tibble(read_csv("ufo_data.csv", na=c('unknown', '', 'Unknown')))
+```
+
+```{r}
+#Posted
+ufo$Posted <- as.Date(ufo$Posted, format = "%m/%d/%y")
+```
+
+
+```{r}
+#Add Date and Time
+getDateFromDateTime <- function(dateTimeString, year){
+  date <- strsplit(dateTimeString, " ")[[1]][1]
+  elements <- strsplit(date, "/")[[1]]
+  dateFinal <- paste(c(elements[1], elements[2], year), collapse="/")
+  return(dateFinal)
+}
+
+getTimeFromDateTime <- function(dateTimeString){
+  # return(dateTimeString)
+  time <- strsplit(dateTimeString, " ")[[1]][2]
+  return(time)
+}
+
+ufo <- ufo %>%
+  rowwise() %>%
+  mutate(
+    Date = as.Date(getDateFromDateTime(`Date / Time`, `year`), format = "%m/%d/%Y"),
+    Time = getTimeFromDateTime(`Date / Time`)
+  )
+```
+
+
+```{r}
+#Clean Shape
+ufo$Shape <- tolower(ufo$Shape)
+ufo$Shape[ufo$Shape == "triangular"] <- "triangle"
+ufo$Shape[ufo$Shape == "changed"] <- "changing"
+```
+
+
+```{r}
+#Add In USA Column
+in_usa <- function(value) {
+  states <- c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", 
+              "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+              "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+              "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+              "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+  if (value %in% states) {
+    return(TRUE)
+  }
+  else {
+    return(FALSE)
+  }
+}
+
+ufo <- ufo %>%
+  mutate(
+      In_USA = in_usa(`State`)
+    )
+```
+
+
+
+
+
+```{r}
+# ufo$Time <- getTimeFromDateTime(ufo$`Date / Time`)
+# ufo$Date <- getDateFromDateTime(ufo$`Date / Time`, ufo$`year`)
+# ufo$dts2 <- as.POSIXct(ufo$Time, format = "%H:%M:%S")
+# ufo$dts3 <- as.POSIXlt(ufo$Time, format = "%H:%M:%S")
+# ufo$dts4 <- as.POSIXlt(ufo$DateRaw, format = "%Y-%m-%d")
+# 
+# ufo
+```
+
+
+
+
+Here is a quick and dirty pass at cleaning the durations
+```{r}
+# Duration
+ufo2 <- ufo
+
+ufo2$Duration <- tolower(ufo2$Duration)
+ufo2$Duration_Raw <- ufo2$Duration
+
+# make all spaces single
+ufo2$Duration_Raw <- gsub("[[:space:]]+", " ", ufo2$Duration_Raw)
+# Remove approx versions
+ufo2$Duration_Raw <- gsub("^approx", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^aprox", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^about", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^abt", "", ufo2$Duration_Raw)
+# Remove Symbols from beginning of all strings
+ufo2$Duration_Raw <- gsub("^[[:punct:]]*", "", ufo2$Duration_Raw)
+# Remove Symbols from end as well
+ufo2$Duration_Raw <- gsub("[[:punct:]]*$", "", ufo2$Duration_Raw)
+# For ranges of time, use minimum value
+ufo2$Duration_Raw <- gsub("([0-9]+)-([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+to[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+-[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+or[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+# change digits
+ufo2$Duration_Raw <- gsub("one", "1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("two", "2", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("three", "3", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("five", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("six", "6", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("ten", "10", ufo2$Duration_Raw)
+# word approximations to digits
+ufo2$Duration_Raw <- gsub("few", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("sew", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("several", "7", ufo2$Duration_Raw)
+
+# left-over plus issue
+ufo2$Duration_Raw <- gsub("\\+", "", ufo2$Duration_Raw)
+# Add spaces if needed between number and time
+ufo2$Duration_Raw <- gsub("([0-9]+)([a-z]+)", "\\1 \\2", ufo2$Duration_Raw)
+# remove any starting spaces
+ufo2$Duration_Raw <- gsub("^[[:space:]]+", "", ufo2$Duration_Raw)
+
+# make all spaces single
+ufo2$Duration_Raw <- gsub("[[:space:]]+", " ", ufo2$Duration_Raw)
+
+```
+
+```{r}
+
+is_half <- function(word) {
+  if (word %in% c("half", "1/2", ".5", "0.5", "05","1/2-")) {
+    return(TRUE)
+  } else {
+    return(FALSE)
+  }
+}
+
+get_seconds_from_times <- function(times){
+  metric <- ""
+  half <- FALSE
+  
+  for(i in 2:length(times)){ #Check all other words
+    times[i] <- trimws(times[i])
+    word <- times[i]
+    
+    metric_temp <- get_time_metric(word)
+    if(metric_temp != ""){
+      metric <- metric_temp
+    } else {
+      half_temp <- is_half(word)
+      if (half_temp){
+        half <- TRUE
+      }
+    }
+  }
+  
+  multiplier <- NA
+  
+  if (metric == "second") {
+    multiplier <- 1
+  } else if (metric == "minute") {
+    multiplier <- 60
+  } else if (metric == "hour") {
+    multiplier <- 3600
+  } else if (metric =="day") {
+    multiplier <- 86400
+  } else if (metric == "week") {
+    multiplier <- 604800
+  } else if (metric == "night") {
+    multiplier <- 28800 # assume "night" is 8 hours
+  } else if (metric == "year") {
+    multiplier <- 31536000
+  } else if (metric == "month") {
+    multiplier <- 2592000
+  } else if (metric == "millisecond") {
+    multiplier <- 1/60
+  } else if (metric == "evening") {
+    multiplier <- 10800 # assume "evening" is 3 hours
+  }
+  
+  
+  if (!is.na(multiplier) && is.numeric(multiplier)){
+    result <- as.numeric(times[1])
+    if (half) {
+      result <- result + 0.5
+    }
+    result <- result * multiplier
+  } else {
+    result <- NA
+  }
+  return(result)
+}
+
+get_time_metric <- function(word) {
+  if (word %in% c("second", "seconds", "secs.", "secs", "sec.", "sec", ",seconds", "seconds,", 
+                  "s", "secopnds", "deconds", "sec's", "secomds", "seconda", "secounds", "segundos",
+                  "seconds;","seconts", "sconds", "seocds", "secodns", "seconfs", "secnds", "seonds",
+                  "secodns", "secunds", "sec.ish", "sec0", "secsonds", "secondds", "sex", "secons",
+                  "sec.s", "desonds", "secsonds", "se", "seconds(twice", "segundo", "secinds", "seckonds",
+                  "ssecs", "sc", "second-", "secconds", "secconds", "secondes", "ses", "ceconds", "secods",
+                  "sseconds", "sek", "swc", "secands", "seoonds", "senconds", "seoonds", "senconds",
+                  "secpnds", "secods", "econds", "sekonds", "seconnds", "sekonds", "secaond", "secds",
+                  "secs.,", "sec`s", "sec.'s", "seounds", "weconds", "second's", "sceonds", "secx",
+                  "segs", "secends", "secends", "secs?", "sic", "seg", "seconcs", "sce", "sec(3", "scounds",
+                  "secants", "secoconds", "secopnd", "scc", "secionds", "mseconds", "seeconds", "seconds-2",
+                  "sicets", "seceonds", "sicets")) {
+    return("second")
+  } else if (word %in% c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
+                         "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
+                         "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
+                         "muntes", "minutue", "minets", "minuutes", "minns", "mins?", "min's", "mi",
+                         "minutes?", "min.s", "inutes", "minuetes", "min.(apprx", "mt", "minu",
+                         "min.'s", "minsutes", "mins.", "minuntes", "miniutes", "miniutes", "minutess",
+                         "minuti", "minuto", "mins-current", "minutea", "minuted", "minutes;", "minues",
+                         "minites", "minuites", "minutese", "mts", "minurtes", "mjn", "miuts", "minnutes",
+                         "mimutes", "min,maybe", "min.plus", "minq", "m", "min`s", "minute's", "minutets",
+                         "menutes", "minits", "mina", "miuntes", "min.appx", "minet", "mins,", "minitues",
+                         "min.-", "mins.approximately", "minuit", "mns", "minutestriangle", "minute's",
+                         "min.max", "minuews", "minuters", "minutes.x", "minit", "mniutes", "min,", "mintes",
+                         "mintute", "minuet", "mintes", "min-", "mim", "-minutes", "minnute", "minnute",
+                         "minuates", "mintutes", "munites", "minuates", "nin", "minugdx", "mintue", "minents",
+                         "mims", "minuits", "mnts", "mnutes", "minuteswhile", "monutes", "minutes/in",
+                         "miute", "mints", "minuter", "minuits", "minuttes", "minuttes", "minute,", "mimuta",
+                         "muinte", "minutues", "minut", "minetes", "mints", "min.bu", "miniuts",
+                         "minutes-intervals", "mln", "miniute", "miinutes", "miinutes", "miniute", ",min",
+                         "minurwa", "minutres", "miunets", "mins(approx", "minures", "miin", "nim", "minates",
+                         "imnures", "mimits", "miites", "min:s", "minuties", ",minute", "min.or", "min.approx",
+                         "munutes", "min/", "min(approx", "minutees", "min/each", "minute?", "minutis",
+                         "min/less", "mns.", "minte", "minutews", "miuets", "minutews", "minute/3", "pns",
+                         "mpns", "minute,maybe")) {
+    return("minute")
+  } else if (word %in% c("hour", "hours", "H", "h", "hrs", "hrs.", "hr", "hpurs", "hous", "hours,", "hour;",
+                         "hour-ish", "hrs.or", "houres", "hr's", "hours,approx", "hhours", "houra", "hour..",
+                         "hiours", "hour/", "hrs,", "hr.", "hr,s", "houre", "h.r", "hour(approx",
+                         "hours/uncertain", "nours", "hrs,c")) {
+    return("hour")
+  } else if (word %in% c("day", "days")) {
+    return("day")
+  } else if (word %in% c("week", "weeks")) {
+    return("week")
+  } else if (word %in% c("night", "nights")) {
+    return("night") # assume "night" is 8 hours
+  } else if (word %in% c("year", "years", "yrs")) {
+    return("year")
+  } else if (word %in% c("month", "months")) {
+    return("month")
+  } else if (word %in% c("millisecond", "milliseconds", "ms")) {
+    return("millisecond")
+  } else if (word %in% c("evening", "evenings")) {
+    return("evening")
+  } else {
+    return("")
+  }
+}
+
+duration_clean_first_pass <- function(value) {
+  if (!is.na(value)) {
+    import <- strsplit(value, " ")
+    times <- paste(import[[1]], sep = " ")
+    result <- " "
+    # if the first value is just a number
+    if (suppressWarnings(!is.na(as.numeric(times[1])) & !is.na(times[2]))) {
+      # trim whitespace from items
+      times[1] <- trimws(times[1])
+      
+      result <- get_seconds_from_times(times)
+      
+      # if (half){
+      #   print('  ')
+      #   print(times)
+      #   print(metric)
+      #   print(result)
+      # }
+    } else if (value %in% c("hour", "hours", "hr")) {
+      result <- 3600 # if "hour", make 3600 seconds
+    } else if (value %in% c("short", "brief", "minute", "minutes", "minets", "less than 1 minute",
+                            "less than a minute")) {
+      result <- 60 # if "short", make 1 minute
+    } else if (value %in% c("seconds", "few seconds", "a few seconds")) {
+      result <- 10 # if "seconds", make 10 seconds
+    } else if (value %in% c("unknown", "?", "???", "not known", "unkn", "don't know", "unk", 
+                            "don't remember", "unsure", "not sure", "uncertain", "unknow", "not given",
+                            "unclear")) {
+      result <- NA
+    } else {
+      # print(times)
+      # result <- paste(times, collapse = " ")
+      result <- NA
+    }
+  }
+  else {
+    result <- NA
+  }
+  # print(result)
+  # print(result[[1]][1])
+  return(result)
+}
+
+ufo2$Duration_Cleaned <- lapply(ufo2$Duration_Raw, duration_clean_first_pass)
+
+ufo$Duration <- as.numeric(ufo2$Duration_Cleaned)
+```
+
+To see how we are doing, let's see how many new NAs are introduced
+```{r}
+ufo2$Duration_Testing <- ufo2$Duration_Cleaned
+
+cat("Before: ", sum(is.na(ufo2$Duration_Testing)))
+
+ufo2$Duration_Testing <- as.numeric(ufo2$Duration_Cleaned)
+
+cat(" After: ", sum(is.na(ufo2$Duration_Testing)))
+
+#Start-- Before:  4686 After:  13853
+#More than 2nd word-- Before:  4676 After:  13018
+#More words-- Before:  4676 After:  12317
+#Done-- Before:  4676 After:  12275
+```
+
+```{r}
+duration <- ufo2$Duration_Testing[!is.na(ufo2$Duration_Testing)]
+
+summary(duration)
+
+str(unique(ufo2$Duration_Cleaned))
+
+```
+
+
+```{r}
+write.csv(ufo, file = "ufo_clean.csv")
+```
+
+```{r}
+ufo_clean <- as_tibble(read_csv("ufo_clean.csv"))
+ufo_clean
+```
+
+
