@@ -438,6 +438,71 @@ ufo$Hoax <- unlist(ufo$Hoax)
 ```
 
 ```{r}
+bin_shape1 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("cigar","circle","cylinder","cone","crescent","disk","dome","egg","oval","round", "sphere", "teardrop")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return(shape)
+
+}
+
+bin_shape2 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("cigar","circle","cylinder","cone","crescent","disk","dome","egg","oval","round", "sphere", "teardrop")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return("Other")
+
+}
+
+bin_shape3 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("circle","cone","crescent","dome","egg","round")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return(shape)
+
+}
+
+
+ufo <- ufo %>% mutate(`Shape1` = lapply(ufo$Shape, bin_shape1))
+ufo <- ufo %>% mutate(`Shape2` = lapply(ufo$Shape, bin_shape2))
+ufo <- ufo %>% mutate(`Shape3` = lapply(ufo$Shape, bin_shape3))
+
+ufo$Shape1 <- unlist(ufo$Shape1)
+ufo$Shape2 <- unlist(ufo$Shape2)
+ufo$Shape3 <- unlist(ufo$Shape3)
+
+table(ufo$Shape)
+
+```
+
+```{r}
 sapply(ufo, class)
 write.csv(ufo, file = "ufo_clean.csv")
 ```
