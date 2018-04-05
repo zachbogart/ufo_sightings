@@ -1,0 +1,15 @@
+---
+title: "Final_Writeup"
+author: "The Crew"
+date: "4/5/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. 
+
+The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
+
