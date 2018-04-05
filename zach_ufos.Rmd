@@ -184,6 +184,10 @@ str(unique(ufo2$Duration_Cleaned))
 ```
 
 
+```{r}
+cleaned <- read_csv("ufo_clean.csv")
+standard <- read_csv("ufo_data.csv")
+```
 
 
 
