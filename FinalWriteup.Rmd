@@ -5,11 +5,140 @@ date: "4/5/2018"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. 
 
 The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
+
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+# library(GGally)
+library(DAAG)
+# library(car)
+library(vcd)
+# library(tidyquant)
+# library(ggmosaic)
+library(ggplot2)
+library(extracat)
+library(scales)
+```
+
+```{r}
+ufo <- as_tibble(read_csv("ufo_clean.csv"))
+ufo <- ufo %>% select(-X1, -X1_1)
+
+```
+
+```{r}
+visna(ufo, sort = "b")
+```
+
+```{r}
+percent_missing <- ufo %>% group_by(`In_USA`) %>%
+summarize(num = n(), num_na = sum(is.na(`Duration`))) %>%
+mutate(percent_na = round(num_na/num, 2)) %>%
+arrange(-percent_na)
+percent_missing
+
+percent_missing <- ufo %>% group_by(`In_USA`) %>%
+summarize(num = n(), num_na = sum(is.na(`Shape`))) %>%
+mutate(percent_na = round(num_na/num, 2)) %>%
+arrange(-percent_na)
+percent_missing
+
+percent_missing <- ufo %>% group_by(`Shape1`) %>%
+summarize(num = n(), num_na = sum(is.na(`Duration`))) %>%
+mutate(percent_na = round(num_na/num, 2)) %>%
+arrange(-percent_na)
+percent_missing
+```
+
+```{r}
+table(ufo$State)
+USA_ufo <- ufo %>% filter(In_USA == TRUE & is.na(Shape2) == FALSE)
+ggplot(USA_ufo, aes(x = State, fill = Shape2)) + 
+    geom_bar()
+
+bin_duration <- function(duration){
+  
+  if(is.na(duration) == TRUE){
+    return(NA)
+  }
+  
+  if(duration < 60){
+    return("Less than a Minute")
+  }
+  else if(duration < 300){
+    return("Between 1 and 5 minutes")
+    
+  }
+  else if(duration < 600){
+    
+    return("Between 5 and 10 minutes")
+  }
+  
+  else if(duration < 1800){
+    return("Between 10 and 30 minutes")
+  }
+  
+  else if (duration < 3600){
+    return("Between 30 minutes and an Hour")
+  }
+  else{
+    return("More than an Hour")
+  }
+  return(NA)
+  
+}
+
+
+
+ufo <- ufo %>% mutate(`Bin_Dur` = lapply(ufo$Duration, bin_duration))
+ufo$Bin_Dur <- unlist(ufo$Bin_Dur)
+ufo <- ufo %>%
+  mutate(Bin_Dur = fct_relevel(Bin_Dur, "Less than a Minute", "Between 1 and 5 minutes", "Between 5 and 10 minutes", "Between 10 and 30 minutes", "Between 30 minutes and an Hour", "More than an Hour"))
+
+
+ggplot(ufo_less_dur, aes(Duration)) + geom_histogram() + facet_wrap(~Shape2)
+ggplot(ufo, aes(x = Bin_Dur, fill = Shape2)) + geom_bar(position = "fill")
+
+
+```
+
+```{r}
+ggplot(USA_ufo, aes(x = State, fill = Shape2)) + geom_bar(position = "fill")
+ggplot(USA_ufo, aes(x = State, fill = Shape2)) + geom_bar()
+
+```
+
+```{r}
+Int_ufo <- ufo %>% filter(In_USA == FALSE & is.na(Shape2) == FALSE)
+ggplot(Int_ufo, aes(x = Shape2)) + geom_bar()
+
+
+```
+
+```{r}
+ufo1950 <- ufo %>% filter(year>=1950)
+ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill")
+ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar()
+
+
+```
+
+```{r}
+ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill")
+ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar()
+
+
+
+```
+
+
 
