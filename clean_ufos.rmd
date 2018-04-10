@@ -1,9 +1,14 @@
 ---
-title: "josh_ufos"
-author: Josh Feldman (jbf2159)
+title: "Data Cleaning"
+author: Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)
 output: html_document
 ---
 
+Analysis of Data Quality
+
+Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.
+
+The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data:
 ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
 knitr::opts_chunk$set(warning = FALSE,
@@ -20,18 +25,21 @@ library(vcd)
 # library(ggmosaic)
 ```
 
+Before reading in the data, we considered `unknown` to be considered as an `NA` value.
 ```{r}
 ufo <- as_tibble(read_csv("ufo_data.csv", na=c('unknown', '', 'Unknown')))
 #Bad Eggs
 ufo <- ufo[-c(3974, 74439),]
+print(head(ufo, n=5))
 ```
 
+An easy fix is to correct the date formats. We converted the `Posted` column to a standard date format.
 ```{r}
 #Posted
 ufo$Posted <- as.Date(ufo$Posted, format = "%m/%d/%y")
 ```
 
-
+And we converted the `Date / Time` into separate columns for easier access:
 ```{r}
 #Add Date and Time
 getDateFromDateTime <- function(dateTimeString, year){
@@ -53,6 +61,14 @@ ufo <- ufo %>%
     Date = as.Date(getDateFromDateTime(`Date / Time`, `year`), format = "%m/%d/%Y"),
     Time = getTimeFromDateTime(`Date / Time`)
   )
+
+print(head(ufo, n=5))
+```
+
+The `Shape` column had a lot of different results. As a quick pass, we merged some results that were just different tenses of the same word:
+```{r}
+print("Before")
+print(table(ufo$Shape))
 ```
 
 
@@ -61,9 +77,18 @@ ufo <- ufo %>%
 ufo$Shape <- tolower(ufo$Shape)
 ufo$Shape[ufo$Shape == "triangular"] <- "triangle"
 ufo$Shape[ufo$Shape == "changed"] <- "changing"
+
+print("After")
+print(table(ufo$Shape))
 ```
 
+Next, the `State` column contained many states that were actually not US States such as Ontario, Canada. Notice how the number of states is much larger than 50:
+```{r}
+print(table(ufo$State))
+print(sprintf("Number of States: %d", dim(table(ufo$State))))
+```
 
+To differentiate USA from non-USA states, we added a column to signify if the sighting occurred in one of the fifty US states or not.
 ```{r}
 #Add In USA Column
 in_usa <- function(value) {
@@ -84,10 +109,12 @@ ufo <- ufo %>%
   mutate(
       In_USA = in_usa(`State`)
     )
+
+print(head(ufo, n=5))
 ```
 
 
-Light Cleaning of City and Extracting Country to the best of our ability
+Next was extracting the country from the `City` column. Many of the rows had the country in the `City` column in parentheses, usually if it was international. To do this, we wrote a function that grabbed the value inside the parentheses and checked if it was a valid country. After this, we had access to different countries and cities where the sightings occurred.
 ```{r}
 
 library(maps)
@@ -150,9 +177,12 @@ ufo$City <- unlist(ufo$City)
 
 ```
 
-
-
 ```{r}
+print(head(ufo, n=5))
+```
+
+
+```{r echo=FALSE}
 # ufo$Time <- getTimeFromDateTime(ufo$`Date / Time`)
 # ufo$Date <- getDateFromDateTime(ufo$`Date / Time`, ufo$`year`)
 # ufo$dts2 <- as.POSIXct(ufo$Time, format = "%H:%M:%S")
@@ -163,9 +193,38 @@ ufo$City <- unlist(ufo$City)
 ```
 
 
+Now we get to the biggest work to do. The `duration` column was all over the place. Here is a random selection of rows from that column:
+```{r}
+print(head(ufo$Duration, n=75))
+```
+Clearly there was a lot to fix. Beyond the misspellings and ranges given, others were way out of left field ("milking cows" anyone?). Below is the code that turned all of these into durations on a common scale. In essence, the code massages a lot of the the corner cases and gets them all into to be numeric. there are too many corner cases to go over individually, but take a look at all the different ways people spelled "minutes" just to get a sense of how messy this column was going in:
+```{r echo=FALSE}
+print(c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
+                         "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
+                         "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
+                         "muntes", "minutue", "minets", "minuutes", "minns", "mins?", "min's", "mi",
+                         "minutes?", "min.s", "inutes", "minuetes", "min.(apprx", "mt", "minu",
+                         "min.'s", "minsutes", "mins.", "minuntes", "miniutes", "miniutes", "minutess",
+                         "minuti", "minuto", "mins-current", "minutea", "minuted", "minutes;", "minues",
+                         "minites", "minuites", "minutese", "mts", "minurtes", "mjn", "miuts", "minnutes",
+                         "mimutes", "min,maybe", "min.plus", "minq", "m", "min`s", "minute's", "minutets",
+                         "menutes", "minits", "mina", "miuntes", "min.appx", "minet", "mins,", "minitues",
+                         "min.-", "mins.approximately", "minuit", "mns", "minutestriangle", "minute's",
+                         "min.max", "minuews", "minuters", "minutes.x", "minit", "mniutes", "min,", "mintes",
+                         "mintute", "minuet", "mintes", "min-", "mim", "-minutes", "minnute", "minnute",
+                         "minuates", "mintutes", "munites", "minuates", "nin", "minugdx", "mintue", "minents",
+                         "mims", "minuits", "mnts", "mnutes", "minuteswhile", "monutes", "minutes/in",
+                         "miute", "mints", "minuter", "minuits", "minuttes", "minuttes", "minute,", "mimuta",
+                         "muinte", "minutues", "minut", "minetes", "mints", "min.bu", "miniuts",
+                         "minutes-intervals", "mln", "miniute", "miinutes", "miinutes", "miniute", ",min",
+                         "minurwa", "minutres", "miunets", "mins(approx", "minures", "miin", "nim", "minates",
+                         "imnures", "mimits", "miites", "min:s", "minuties", ",minute", "min.or", "min.approx",
+                         "munutes", "min/", "min(approx", "minutees", "min/each", "minute?", "minutis",
+                         "min/less", "mns.", "minte", "minutews", "miuets", "minutews", "minute/3", "pns",
+                         "mpns", "minute,maybe"))
+```
+...yeah.
 
-
-Here is a quick and dirty pass at cleaning the durations
 ```{r}
 # Duration
 ufo2 <- ufo
@@ -389,7 +448,7 @@ ufo2$Duration_Cleaned <- lapply(ufo2$Duration_Raw, duration_clean_first_pass)
 ufo$Duration <- as.numeric(ufo2$Duration_Cleaned)
 ```
 
-To see how we are doing, let's see how many new NAs are introduced
+At this point, we have cleaned the `duration` column. We checked that we didn't introduce any new `NAs` accidentally and we were finished.
 ```{r}
 ufo2$Duration_Testing <- ufo2$Duration_Cleaned
 
@@ -405,15 +464,41 @@ cat(" After: ", sum(is.na(ufo2$Duration_Testing)))
 #Done-- Before:  4676 After:  12275
 ```
 
+We can see now that the `duration` varied a lot across all sightings, with some lasting "all night" and others lasting a few seconds.
 ```{r}
 duration <- ufo2$Duration_Testing[!is.na(ufo2$Duration_Testing)]
 
 summary(duration)
 
-str(unique(ufo2$Duration_Cleaned))
+# str(unique(ufo2$Duration_Cleaned))
 
 ```
 
+Most of the sightings were under an hour, with spikes in the ranges of seconds and "5 minutes"
+```{r}
+duration_df <- data_frame(duration)
+duration_df_lo <- duration_df %>%
+  filter(duration < 3600)
+ggplot(duration_df_lo, aes(x = duration)) + geom_histogram(bins = 50) + ggtitle("Hour range for sightings")
+
+#percentage of duration for low values
+lo_size <- dim(duration_df_lo)[1]
+total_size <- dim(duration_df)[1]
+print(sprintf("Perc. Sightings that are under 1 hour: %f", lo_size / total_size))
+
+duration_df_lo <- duration_df %>%
+  filter(duration < 600)
+ggplot(duration_df_lo, aes(x = duration)) + geom_histogram(bins = 50) + ggtitle("Sightings under 10 minutes")
+
+#percentage of duration for low values
+lo_size <- dim(duration_df_lo)[1]
+total_size <- dim(duration_df)[1]
+print(sprintf("Perc. Sightings that are under 10 minutes: %f", lo_size / total_size))
+```
+
+Included in the dataset was the `summary` column that included whether the sighting was considered a hoax. the site has this to say: "We encourage visitors to our site to always be on the alert for errors and hoaxed reports, and in particular, with regard to those reports that have been submitted by parties who elect to remain anonymous.  We have attempt to label those reports that have been submitted by individuals who do not share their names or contact information together with their reports.(http://www.nuforc.org/)"
+
+We included a column to be able to differentiate between hoaxes.
 ```{r}
 ishoax <- function(comment){
   
@@ -437,6 +522,7 @@ ufo$Hoax <- unlist(ufo$Hoax)
 
 ```
 
+Finally, since the `Shape` column had so many different kinds included, we separated them into 
 ```{r}
 bin_shape1 <- function(shape){
   if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
