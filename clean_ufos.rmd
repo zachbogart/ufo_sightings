@@ -522,7 +522,7 @@ ufo$Hoax <- unlist(ufo$Hoax)
 
 ```
 
-Finally, since the `Shape` column had so many different kinds included, we separated them into 
+Finally, since the `Shape` column had so many different kinds included. We had different takes on what the bins would work well for analysis.
 ```{r}
 bin_shape1 <- function(shape){
   if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
@@ -588,6 +588,7 @@ table(ufo$Shape)
 
 ```
 
+Finally, we write the results to an new CSV and use that file in our analysis.
 ```{r}
 sapply(ufo, class)
 write.csv(ufo, file = "ufo_clean.csv")
