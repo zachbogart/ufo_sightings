@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<head>
 <style>
+
+svg {
+  float: left;
+}
+
+#commentDiv {
+  float: left;
+  margin-left: 20px;
+  /*height: 100%;
+  overflow: auto;*/
+}
 
 .links line {
   stroke: #999;
@@ -8,14 +20,51 @@
 }
 
 .nodes circle {
-  stroke: #fff;
-  stroke-width: 1.5px;
+  /*stroke: #fff;*/
+  stroke-width: 2.5px;
+}
+
+.green {
+  color: #32CD32;
+} 
+
+/*This borrowed is stolen from: https://www.w3schools.com/css/tryit.asp?filename=trycss_table_fancy*/
+#table {
+    font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+    border-collapse: collapse;
+    width: 500px;
+    table-layout: fixed;
+}
+
+#table td, #table th {
+    border: 1px solid #ddd;
+    padding: 18px;
+}
+
+#table tr:nth-child(even){background-color: #f2f2f2;}
+
+#table tr:hover {background-color: #ddd;}
+
+#table th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    text-align: center;
+    background-color: #4CAF50;
+    color: white;
 }
 
 </style>
-<svg width="960" height="600"></svg>
 <script src="https://d3js.org/d3.v4.min.js"></script>
+</head>
+
+<body>
+<svg width="600" height="600"></svg>
+<div id="commentDiv"></div>
 <script>
+
+var comments = [];
+var chosenComments = [];
+var chosenWord = "No Word Selected"
 
 var svg = d3.select("svg"),
     width = +svg.attr("width"),
@@ -28,8 +77,16 @@ var simulation = d3.forceSimulation()
     .force("charge", d3.forceManyBody())
     .force("center", d3.forceCenter(width / 2, height / 2));
 
-d3.json("force.json", function(error, graph) {
+d3.json("force_250.json", function(error, graph) {
   if (error) throw error;
+
+  var minGroup = Math.min.apply(Math, graph.nodes.map(function(d){return d["group"];}));
+  var maxGroup = Math.max.apply(Math, graph.nodes.map(function(d){return d["group"];}));
+  var minRadius = 5;
+  var maxRadius = 75;
+  var rScale = d3.scaleSqrt()
+    .domain([minGroup, maxGroup])
+    .range([minRadius, maxRadius]);
 
   var link = svg.append("g")
       .attr("class", "links")
@@ -43,12 +100,18 @@ d3.json("force.json", function(error, graph) {
     .selectAll("circle")
     .data(graph.nodes)
     .enter().append("circle")
-      .attr("r", d => d.group*25)
+      .attr("r", d => rScale(d.group))
       .attr("fill", function(d) { return color(d.group); })
+      .attr("stroke", function(d) { return color(d.group); })
+      // .attr("stroke-width", function(d) { return "1.5px"; })
       .call(d3.drag()
           .on("start", dragstarted)
           .on("drag", dragged)
-          .on("end", dragended));
+          .on("end", dragended))
+      .on("click", function(d) {
+        circleClicked(d)
+      })
+      ;
 
   node.append("title")
       .text(function(d) { return d.id; });
@@ -77,8 +140,20 @@ d3.json("force.json", function(error, graph) {
         .attr("y2", function(d) { return d.target.y; });
 
     node
-        .attr("cx", function(d) { return d.x; })
-        .attr("cy", function(d) { return d.y; });
+        // .attr("cx", function(d) { return d.x; })
+        // .attr("cy", function(d) { return d.y; });
+        .attr("cx", function(d) { 
+          return d.x = Math.max(
+            rScale(d.group) + minRadius/2, 
+            Math.min(width - rScale(d.group), d.x) - minRadius/2
+          ); 
+        })
+        .attr("cy", function(d) { 
+          return d.y = Math.max(
+            rScale(d.group) + minRadius/2, 
+            Math.min(height - rScale(d.group), d.y) - minRadius/2
+          ); 
+        });
   }
 });
 
@@ -99,4 +174,97 @@ function dragended(d) {
   d.fy = null;
 }
 
+function updateCircles(chosenCircleID) {
+  d3.selectAll("circle")
+    .attr("stroke", function(d) { return d.id == chosenCircleID ? "black" : color(d.group); })
+    ;
+}
+
+function circleClicked(d) {
+  updateCircles(d.id);
+  if (comments) {
+    chosenWord = d["id"];
+    chosenComments = comments.filter(function(comment) { 
+      if (comment) {
+        return comment.includes(" " + chosenWord);
+      } else {
+        return false;
+      }
+    });
+    updateChosenWord(chosenWord, chosenComments.length);
+    updateComments(chosenComments);
+  }
+}
+
+d3.json("comments_common_500.json", function(error, data) {
+  comments = data
+  console.log("Loaded comments: " + comments.length)
+})
+
+var commentTable = d3.select('#commentDiv')
+  .append('table')
+  .attr('id', 'table')
+  ;
+
+var commentTableHead = commentTable.append('thead')
+  .append('tr')
+  .append('th')
+  .attr('id', 'commentHeadText')
+  .text(chosenWord)
+  ;
+var commentTableBody = commentTable.append('tbody');
+
+
+function updateChosenWord(chosenWord, numChosenComments) {    
+  d3.select("#commentHeadText")
+    .text(chosenWord)
+    ;
+}
+
+function createCommentHTML(comment, word) {
+  return comment.replace(" " + word, "<span class=green> " + word + "</span>");
+}
+
+function updateComments(chosenComments) {
+  var rows = commentTableBody.selectAll('tr')
+    .data(shuffle(chosenComments))
+    ;
+
+  rows.exit()
+    .remove();
+
+  rows
+    .enter()
+    .append('tr')
+    .merge(rows)
+    .html(d => "<td>" + createCommentHTML(d, chosenWord) + "</td>");
+}
+
+updateComments(chosenComments);
+updateChosenWord(chosenWord, chosenComments.length);
+
+// Borrowed from https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
+function shuffle(array) {
+  var currentIndex = array.length, temporaryValue, randomIndex;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+
+    // Pick a remaining element...
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}
+
+
+
+
 </script>
+</body>
