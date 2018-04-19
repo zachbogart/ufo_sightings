@@ -24,10 +24,12 @@ Two-word affinity
 We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be found ___________.
 
 
+
+
+
 # 3 Analysis of Data Quality
 *Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
 
-The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data:
 ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
 knitr::opts_chunk$set(warning = FALSE,
@@ -42,9 +44,12 @@ library(DAAG)
 library(vcd)
 # library(tidyquant)
 # library(ggmosaic)
+library(ggplot2)
+library(extracat)
+library(scales)
 ```
 
-Before reading in the data, we considered `unknown` to be considered as an `NA` value.
+The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data. Before reading in the data, we considered `unknown` to be considered as an `NA` value.
 ```{r}
 ufo <- as_tibble(read_csv("ufo_data.csv", na=c('unknown', '', 'Unknown')))
 #Bad Eggs
@@ -634,34 +639,12 @@ write.csv(ufo, file = "ufo_clean.csv")
 
 ```{r}
 ufo_clean <- as_tibble(read_csv("ufo_clean.csv"))
-ufo_clean
+ufo_clean 
 ```
-
-
-
 
 
 
 # 4 Main Analysis
-
-```{r setup, include=FALSE}
-# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
-knitr::opts_chunk$set(warning = FALSE,
-                      message = FALSE, 
-                      cache = TRUE)
-
-library(Sleuth3)
-library(tidyverse)
-# library(GGally)
-library(DAAG)
-# library(car)
-library(vcd)
-# library(tidyquant)
-# library(ggmosaic)
-library(ggplot2)
-library(extracat)
-library(scales)
-```
 
 ```{r}
 ufo <- as_tibble(read_csv("ufo_clean.csv"))
