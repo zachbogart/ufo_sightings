@@ -6,9 +6,9 @@ output: html_document
 ---
 
 # 1 Introduction
+TODO
 *Explain why you chose this topic, and the questions you are interested in studying.*
 *List team members and a description of how each contributed to the project.*
-TODO
 
 # 2 Description of Data
 *Describe how the data was collected, how you accessed it, and any other noteworthy features.*
@@ -17,11 +17,12 @@ Our data was scraped off of the National UFO Reporting Center’s (NUFORC) websi
 
 The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
 
-#### Data Scraping
+Data Scraping
 We developed a python script to scrape the data from http://www.nuforc.org/webreports/. There is one index page for each month that contains links to detailed description of each UFO sighting. Using a html parsing package named BeautifulSoup, the script goes through each of these links to extract the data fields including date/time of observation, shape, city, state, duration, and full description. The source code can be found ____________.
 
-#### Two-word affinity
+Two-word affinity
 We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be found ___________.
+
 
 
 # 3 Analysis of Data Quality
@@ -48,7 +49,8 @@ library(statebins)
 library(lubridate)
 ```
 
-The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data. Before reading in the data, we considered `unknown` to be considered as an `NA` value.
+The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data. Before reading in the data, we considered `unknown` to be considered as an `NA` value. There were two observations (row number 3974, 74439) that did not work with our data cleaning process due to it's strange formating. 
+
 ```{r}
 ufo <- as_tibble(read_csv("ufo_data.csv", na=c('unknown', '', 'Unknown')))
 #Bad Eggs
@@ -763,7 +765,6 @@ ggplot(ufodurclip, aes(x = Duration)) + geom_histogram()
 ```
 
 
-
 We're going to need to control for population, as most of the most popular states (California) have large numbers of sightings due to it's size. 
 
 ```{r}
@@ -819,7 +820,7 @@ Again, it appears that the distribution of shapes of sightings for each state se
 ggplot(USA_ufo, aes(x = State, fill = Shape2)) + geom_bar(position = "fill")
 ```
 
-It's difficult to see in this graph, but it looks as if the states that have the highest sightings per 10,000 residents are somewhat suprising: WA, VT, MT, AK, OR, and ME. First of all, 4 of these states are on the coast. Secondly, there seems to be a west coast bias to the states. This makes sense as the headquarters of NUFORC is in CA. Thirdly, all of these states are fairly rural, but in a different way from how Texas is rural. People in all of these states tend to be fairly outdoorsy, versus states like Alabama, Texas, and Georgia, where people tend to stay inside as much as they can and obesity rates are higher. It might be a weak conclusions, but UFO sightings might be correlated with the amount of time that people spend outside. We will use 3 different proxies: Hours a day spent doing Sports, Excercise, and Recreation, Percentage of Population Engaged in Sports and Recreation daily, and Obesity rate. As there is no measure for how much time people spend outside, we believe that outside of people who work outside, most people are outside to excercise and these 3 proxies are at the least correlated with outdoor activity. Because all of our 3 proxies come to similar conclusions, we feel that there is a certain robustness to our seemingly trivial result. 
+It's difficult to see in this graph, but it looks as if the states that have the highest sightings per 10,000 residents are somewhat suprising: WA, VT, MT, AK, OR, and ME. First of all, 4 of these states are on the coast. Secondly, there seems to be a west coast bias to the states. This makes sense as the headquarters of NUFORC is in CA. Thirdly, all of these states are fairly rural, but in a different way from how Texas is rural. People in all of these states tend to be fairly outdoorsy, versus states like Alabama, Texas, and Georgia, where people tend to stay inside as much as they can and obesity rates are higher. It might be a weak conclusion, but UFO sightings might be correlated with the amount of time that people spend outside. We will use 3 different proxies: Hours a day spent doing Sports, Excercise, and Recreation, Percentage of Population Engaged in Sports and Recreation daily, and Obesity rate. As there is no measure for how much time people spend outside, we believe that most people are outside to excercise and these 3 proxies are at the least correlated with outdoor activity. Because all of our 3 proxies come to similar conclusions, we feel that there is a certain robustness to our seemingly trivial result. 
 
 ```{r}
 USA_ufo <- merge(USA_ufo, state_pops, by = "State")
