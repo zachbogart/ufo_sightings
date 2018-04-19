@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+clean_ufos_cache/
+clean_ufos_files/
+*.html
