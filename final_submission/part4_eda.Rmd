@@ -1,0 +1,373 @@
+---
+title: "EDAV Project: UFO Sightings"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+date: "4/5/2018"
+output: html_document
+---
+
+# 4 Main Analysis
+## EDA
+
+This file explores the cleaned version of the dataset provided by the `part4_cleaning.rmd` file.
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+
+library(DAAG)
+
+library(vcd)
+
+library(ggplot2)
+library(extracat)
+library(scales)
+library(micromapST)
+library(statebins)
+library(lubridate)
+```
+
+To begin, we read in the cleaned data as well as some additional data we will compare against later on. For this analysis, we binned the shapes into five categories.
+```{r add-data, warning=FALSE}
+ufo <- as_tibble(read_csv("data/ufo_clean.csv"))
+ufo <- ufo %>% select(-X1, -X1_1)
+
+state_pops <- as_tibble(read_csv("data/StatePops.csv"))
+excer <- as_tibble(read.csv("data/Excercise.csv"))
+colnames(excer)[2] <- "Excercise"
+
+trump_state <- as_tibble(read_csv("data/TrumpState.csv"))
+
+obese <- as_tibble(read_csv("data/Obesity.csv"))
+
+ufo <- ufo %>%
+  mutate(Shape2 = fct_relevel(Shape2, "Circle", "Light", "Triangle", "Rectangle", "Other"))
+```
+
+#### NA NA NA NA...
+
+Looking at the `NA` patterns, we see the vast majority of the cleaned dataset has no `NA` values (yay!). Let's look at the columns with the most `NA` values.
+```{r NA-plot}
+visna(ufo, sort = "b")
+```
+
+Grouping by USA and international sightings, we see that there is no noticable difference between the `NA` percentages observed. Here is the `NA` percentages by `Duration` column:
+```{r NA-stats-duration}
+percent_missing <- ufo %>% group_by(`In_USA`) %>%
+summarize(num = n(), num_na = sum(is.na(`Duration`))) %>%
+mutate(percent_na = round(num_na/num, 2)) %>%
+arrange(-percent_na)
+percent_missing
+```
+
+And by `Shape`. Again, no significant percentage difference.
+```{r NA-stats-shape}
+percent_missing <- ufo %>% group_by(`In_USA`) %>%
+summarize(num = n(), num_na = sum(is.na(`Shape`))) %>%
+mutate(percent_na = round(num_na/num, 2)) %>%
+arrange(-percent_na)
+percent_missing
+```
+
+For the `Shape1` column, it was grouped into more bins. We see that the shapes have similar `NA` percentages.
+```{r NA-stats-shape1}
+percent_missing <- ufo %>% group_by(`Shape1`) %>%
+summarize(num = n(), num_na = sum(is.na(`Duration`))) %>%
+mutate(percent_na = round(num_na/num, 2)) %>%
+arrange(-percent_na)
+percent_missing
+```
+
+Review Sightings by State
+```{r state-review}
+table(ufo$State)
+USA_ufo <- ufo %>% filter(In_USA == TRUE & is.na(Shape2) == FALSE)
+```
+
+Here we split the duration into discrete bins to make future plotting easier
+```{r duration-binning-custom}
+bin_duration <- function(duration){
+  
+  if(is.na(duration) == TRUE){
+    return(NA)
+  }
+  
+  if(duration < 60){
+    return("< 1")
+  }
+  else if(duration < 300){
+    return("1 - 5")
+    
+  }
+  else if(duration < 600){
+    
+    return("5 - 10")
+  }
+  
+  else if(duration < 1800){
+    return("10 - 30")
+  }
+  
+  else if (duration < 3600){
+    return("30 - 60")
+  }
+  else{
+    return("60+")
+  }
+  return(NA)
+  
+}
+```
+
+#### Unidentified Flying Graphs
+
+```{r format-data-for-plotting}
+ufo <- ufo %>% mutate(`Bin_Dur` = lapply(ufo$Duration, bin_duration))
+ufo$Bin_Dur <- unlist(ufo$Bin_Dur)
+ufo <- ufo %>%
+  mutate(Bin_Dur = fct_relevel(Bin_Dur, "< 1", "1 - 5", "5 - 10", "10 - 30", "30 - 60", "60+"))
+
+
+```
+
+As we can see with the last graph, there is a clear increase in sightings since the increased availability of the internet. Although there are some sightings that occur pre-1900 (handful, pushing out x-axis), almost all sightings occur post-1900.
+
+```{r sighting-freq}
+ggplot(ufo, aes(x = year)) + geom_bar() +
+  ggtitle("Sighting Frequency (Full Dataset Timescale)")
+ufo1950 <- ufo %>% filter(year>=1950)
+ggplot(ufo1950, aes(x = year)) + geom_bar() +
+  ggtitle("Sighting Frequency (1950-2018)")
+```
+
+
+As seen below, the most frequent shape of observations in the data are circular shaped observations with light as a close second. 
+
+```{r shape-bar-graph}
+ggplot(ufo, aes(x = Shape2)) + geom_bar() +
+  ggtitle("Sighting Frequency by Observed Shape") +
+  xlab("Shape")
+```
+
+Most of the sightings in the dataset are fairly short (between seconds and 5 minutes); however, there are a significant amount of sightings of all durations. 
+
+```{r duration-bar-graph}
+ggplot(ufo, aes(x = Bin_Dur)) + geom_bar() + labs(x = "Duration in Minutes", y = "Number of Sightings") +
+  ggtitle("Sighting Frequency by Duration")
+```
+
+And the majority of sightings don't take long, occuring for less than an hour.
+```{r hour-limit-histogram}
+ufodurclip <- ufo %>% filter(is.na(Duration) == FALSE & Duration <= 3600)
+ggplot(ufodurclip, aes(x = Duration)) + geom_histogram() +
+  ggtitle("Duration Histogram, Limited to 1 Hour")
+```
+
+
+We're going to need to control for population, as most of the most popular states (California) have large numbers of sightings due to it's size. 
+
+```{r uncontrolled-state-histogram}
+ufostate <- ufo %>% filter(is.na(State) == FALSE & In_USA == TRUE)
+ggplot(ufostate, aes(x = State)) + geom_bar() +
+  ggtitle("Sightings by State (no population correction)")
+```
+
+Internationally, Canada dominates with 4529 sightings. Clearly, this data is very focused on North America.
+```{r international-histogram-canada}
+internationalufo <- ufo %>% filter(In_USA == FALSE & is.na(Country) == FALSE)
+ggplot(internationalufo, aes(x = Country)) + geom_bar()
+table(internationalufo$Country)
+```
+
+#### Shape(s) of YoU(FO)
+
+Here, we explore the shape of the sightings reported from all the angles we can think of.
+
+In this graph it's hard to see, but the overal distribution of shapes and duration of sighting is fairly constant.
+
+```{r prop-shape-duration}
+ufo <- ufo %>% filter(is.na(Bin_Dur) == FALSE)
+ggplot(ufo, aes(x = Bin_Dur, fill = Shape2)) + geom_bar(position = "fill") + labs(x = "Duration of Sighting", y = "Proportion") + ggtitle("Proportion of Sightings by Shape by Duration of Sighting")+ guides(fill=guide_legend(title="Shape"))
+
+```
+
+Here are the results split by facet-wrap to better see the trends by count across duration changes.
+```{r shape-facet-wrap}
+ggplot(ufo, aes(x = Bin_Dur, fill = Shape2)) +
+  geom_bar() + facet_wrap(~Shape2) +
+  ggtitle("Duration Frequency by Shape") +
+  xlab("Duration")
+
+```
+
+```{r prop-shape-duration2}
+temp <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(Bin_Dur) %>% summarize(durfreq = n())
+durshape <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(Bin_Dur, Shape2) %>% summarize(durshapefreq = n())
+durshape <- merge(durshape, temp, by="Bin_Dur")
+durshape$prop <- durshape$durshapefreq/durshape$durfreq
+
+ggplot(durshape, aes(x = Bin_Dur, y = prop, fill = Shape2)) + geom_bar(position = "dodge", stat = "identity") +
+  ggtitle("Proportion of Shape Sightings by Duration") +
+  xlab("Duration")
+```
+
+We can easily see in this graph, that the proportion of sightings for each duration is fairly constant. The only trend is a slight decrease in `Triangular` shaped sightings as duration increases and an increase in `other` as the duration increases. 
+
+```{r shape-prop-facet}
+ggplot(durshape, aes(x = Bin_Dur, y = prop, fill = Shape2)) +
+  geom_bar(stat = "identity") + facet_wrap(~Shape2) +
+  ggtitle("Shape Proportion Across Durations") +
+  xlab("Duration")
+```
+
+```{r shape-freq-facet}
+
+ggplot(ufodurclip, aes(Duration, fill = Shape2)) + geom_histogram() + facet_wrap(~Shape2) +
+  ggtitle("Shape Frequency Across Durations")
+
+```
+
+Again, it appears that the distribution of shapes of sightings for each state seems to be fairly constant. 
+
+```{r shape-by-state}
+ggplot(USA_ufo, aes(x = State, fill = Shape2)) + geom_bar(position = "fill") +
+  ggtitle("Shapes by State are Constant")
+```
+
+It's difficult to see in this graph, but it looks as if the states that have the highest sightings per 10,000 residents are somewhat suprising: WA, VT, MT, AK, OR, and ME. First of all, 4 of these states are on the coast. Secondly, there seems to be a west coast bias to the states. This makes sense as the headquarters of NUFORC is in CA. Thirdly, all of these states are fairly rural, but in a different way from how Texas is rural. People in all of these states tend to be fairly outdoorsy, versus states like Alabama, Texas, and Georgia, where people tend to stay inside as much as they can and obesity rates are higher. It might be a weak conclusion, but UFO sightings might be correlated with the amount of time that people spend outside. We will use 3 different proxies: Hours a day spent doing Sports, Excercise, and Recreation, Percentage of Population Engaged in Sports and Recreation daily, and Obesity rate. As there is no measure for how much time people spend outside, we believe that most people are outside to excercise and these 3 proxies are at the least correlated with outdoor activity. Because all of our 3 proxies come to similar conclusions, we feel that there is a certain robustness to our seemingly trivial result. 
+
+```{r state-population-factored}
+USA_ufo <- merge(USA_ufo, state_pops, by = "State")
+USA_ufo_summary <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Shape2, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+ggplot(USA_ufo_summary, aes(x = reorder(State, -Prop), y = Prop, fill = Shape2)) + geom_bar(stat = "identity") + labs(y = "Sightings per 10,000 Residents", x = "State") +
+  ggtitle("Sightings by State, Population Corrected")
+
+```
+
+The above results can be shown on a map to see that there is some spatial aspect to where the sightings occur.
+```{r state-map-sightings}
+temp5 <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+temp5$state <- temp5$State
+statebins(temp5, value_col = "Prop", text_color =  "black", font_size = 3, legend_title = "Sightings Per 10,000 Residents", legend_position =  "bottom") + labs(title = "The Coasts are More Supernatural")
+
+```
+
+http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html
+https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm
+
+#### Extraterrestrial Correlations
+
+```{r}
+USA_ufo_summary2 <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary2 <- merge(USA_ufo_summary2, excer, by = "State")
+ggplot(USA_ufo_summary2, aes(x = ATUS, y = Prop)) + geom_point(stat = "identity") + labs(x = "Hours a day spent doing Sports, Excercise, Recreation", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State)+ geom_smooth(method='lm',formula=y~x)
+```
+
+```{r}
+ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
+
+```
+
+https://stateofobesity.org/adult-obesity/
+
+```{r}
+USA_ufo_summary2 <- merge(USA_ufo_summary2, obese, by = "State")
+ggplot(USA_ufo_summary2, aes(x = Obesity, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Obese Adults", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
+
+```
+
+We wanted to see if other state-by-state features were correlated with sightings per 10,000 residents. One of the most interesting was to see if political affiliation would be correlated with sightings per 10,000 residents. As we can see here, there seems to be a slight negative trend with Donald Trump's 2016 election margin by state. The data in first graph is from 1995, but when we limit it to since 2014 (electoral map has essentially looked the same since 2014) the trend looks essentially the same. In our opinion, we find it much more likely that Trump voters are much more likely to not go outside.  
+
+```{r}
+USA_ufo_summary2 <- merge(USA_ufo_summary2, trump_state, by = "State")
+USA_ufo_summary2 <- USA_ufo_summary2 %>% filter(State != 'DC')
+ggplot(USA_ufo_summary2, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
+
+```
+
+```{r}
+USA_ufo_summary3 <- USA_ufo %>% filter(year >= 2014 & State != "DC") %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary3 <- merge(USA_ufo_summary3, trump_state, by = "State")
+ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary3$State) + geom_smooth(method='lm',formula=y~x)
+```
+
+Unlike shape and duration, there is a clear change in the proportion of the shapes of observations since 1950. The obvious one is The proportion of circles clearly goes down and the proportion of light and triangles go up. 
+
+```{r}
+
+ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill")
+ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar()
+
+
+```
+
+It appears in this graph that also the duration of sightings decreases with time. 
+
+```{r}
+ufo1950 <- ufo1950 %>% filter(is.na(Bin_Dur) == FALSE)
+ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill")
+ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar()
+
+
+
+```
+
+We can see here that there was a large increase in both circle and light sightings in between 2010 and 2015, while rectangular and triangular have for the most part remained constant. 
+
+```{r}
+
+shape_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2) %>% summarize(freq = n())
+ggplot(shape_overtime, aes(year, freq, color = Shape2)) + geom_line() +
+    ggtitle("UFO Sighting Shapes Overtime") +
+    labs (x = "Year", y = "Frequency")
+```
+
+It appears from this graph that longer duration sightings longer than 30 minutes has been relatively constant, while there has been a proliferation, particularly since 2010 of short duration observations. 
+
+```{r}
+dur_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur) %>% summarize(freq = n())
+ggplot(dur_overtime, aes(year, freq, color = Bin_Dur)) + geom_line() +
+    ggtitle("UFO Sighting Durations Overtime") +
+    labs (x = "Year", y = "Frequency")
+
+
+```
+
+Moving back in time to 1950, a much large proportion of shapes were circles, but as time progressed circles became less proportional and moved towards the same range as the others.
+
+```{r}
+
+temp2 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
+temp2 <- merge(ufo, temp2, by = "year")
+shape_overtime <- temp2 %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
+ggplot(shape_overtime, aes(year, Prop, color = Shape2)) + geom_line() +
+    ggtitle("UFO Sighting Shapes Over Time") +
+    labs (x = "Year", y = "Proportion of Sightings")
+```
+
+As one can see here the proportion of durations was incredibly variable before 1995, but after 1995 the proportion of durations of observations became less variable. 
+
+```{r}
+temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
+temp3 <- merge(ufo, temp3, by = "year")
+dur_overtime <- temp3 %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
+ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings")
+
+
+```
+
+A summary of the above finding, the average duration over time can clearly be seen to be more variable prior to around 1995, where it became much more stable. There is also an overal decrease in sighting duration. 
+
+```{r}
+truedur_overtime <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Duration) == FALSE & Duration <= 3600) %>% group_by(year) %>% summarize(AvgDur = mean(Duration) ) 
+
+ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Mean Duration (Seconds)")
+
+
+```

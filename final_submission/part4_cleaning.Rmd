@@ -1,0 +1,616 @@
+---
+title: "EDAV Project: UFO Sightings"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+date: "4/5/2018"
+output: html_document
+---
+
+# 4 Main Analysis
+## Cleaning
+*Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
+
+This file takes the raw dataset and standardizes the output so EDA is easier.
+
+**Note: This file takes a while to run**
+
+We separated it from the rest of the analysis to make it easier to work with the files and since knitting the document would either take a while or cache a lot.
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+
+library(DAAG)
+
+library(vcd)
+
+library(ggplot2)
+library(extracat)
+library(scales)
+library(micromapST)
+library(statebins)
+library(lubridate)
+library(maps)
+```
+
+Let's get cleaning! The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data. Before reading in the data, we considered `unknown` to be considered as an `NA` value. There were two observations (row number 3974, 74439) that did not work with our data cleaning process due to it's strange formatting. 
+
+```{r pull-in-data}
+# read in raw data
+ufo <- as_tibble(read_csv("data/ufo_data.csv", na=c('unknown', '', 'Unknown')))
+#Bad Eggs
+ufo <- ufo[-c(3974, 74439),]
+print(head(ufo, n=5))
+```
+
+An easy fix is to correct the date formats. We converted the `Posted` column to a standard date format.
+```{r posted-fix}
+#Posted
+ufo$Posted <- as.Date(ufo$Posted, format = "%m/%d/%y")
+```
+
+And we converted the `Date / Time` into separate columns for easier access:
+```{r date-time-separate}
+#Add Date and Time
+getDateFromDateTime <- function(dateTimeString, year){
+  date <- strsplit(dateTimeString, " ")[[1]][1]
+  elements <- strsplit(date, "/")[[1]]
+  dateFinal <- paste(c(elements[1], elements[2], year), collapse="/")
+  return(dateFinal)
+}
+
+getTimeFromDateTime <- function(dateTimeString){
+  # return(dateTimeString)
+  time <- strsplit(dateTimeString, " ")[[1]][2]
+  return(time)
+}
+
+ufo <- ufo %>%
+  rowwise() %>%
+  mutate(
+    Date = as.Date(getDateFromDateTime(`Date / Time`, `year`), format = "%m/%d/%Y"),
+    Time = getTimeFromDateTime(`Date / Time`)
+  )
+
+print(head(ufo, n=5))
+```
+
+The `Shape` column had a lot of different results. As a quick pass, we merged some results that were just different tenses of the same word:
+```{r shape-before}
+print("Before")
+print(table(ufo$Shape))
+```
+
+
+```{r shape-after-tenses}
+#Clean Shape
+ufo$Shape <- tolower(ufo$Shape)
+ufo$Shape[ufo$Shape == "triangular"] <- "triangle"
+ufo$Shape[ufo$Shape == "changed"] <- "changing"
+
+print("After")
+print(table(ufo$Shape))
+```
+
+Next, the `State` column contained many states that were actually not US States such as Ontario, Canada. Notice how the number of states is much larger than 50:
+```{r states-input}
+print(table(ufo$State))
+print(sprintf("Number of States: %d", dim(table(ufo$State))))
+```
+
+```{r clean-state-function}
+clean_state <- function(state){
+  if (is.na(state)) {
+    return(NA)
+  }
+  if(state == "Ca"){
+    return("CA")
+  }
+  if(state == "Fl"){
+    return("FL")
+  }
+  return(state)
+}
+
+ufo$State = lapply(ufo$State, clean_state)
+ufo$State = unlist(ufo$State)
+```
+
+
+To differentiate USA from non-USA states, we added a column to signify if the sighting occurred in one of the fifty US states or not.
+```{r in-usa-add-column}
+#Add In USA Column
+in_usa <- function(value) {
+  states <- c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", 
+              "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+              "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+              "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+              "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+  if (value %in% states) {
+    return(TRUE)
+  }
+  else {
+    return(FALSE)
+  }
+}
+
+ufo <- ufo %>%
+  mutate(
+      In_USA = in_usa(`State`)
+    )
+
+print(head(ufo, n=5))
+```
+
+Next was extracting the country from the `City` column. Many of the rows had the country in the `City` column in parentheses, usually if it was international. To do this, we wrote a function that grabbed the value inside the parentheses and checked if it was a valid country. After this, we had access to different countries and cities where the sightings occurred.
+**Note: This is the part that takes a while to run :)**
+```{r extract-city-country}
+
+world <- map("world", plot=FALSE)
+
+extract_country <- function(city){
+  
+if(is.na(city)){
+  return(NA)
+}
+  
+else if(grepl( '\\)', city) == TRUE){
+  words <- unlist(strsplit(city, "\\("))
+  potential_country <- substr(words[2], 1, nchar(words[2])-1) 
+  if(potential_country %in% world$names)
+    return(potential_country)
+  else{
+    return(NA)
+  }
+
+  }
+else{
+    return(NA)
+  }
+}
+
+clean_city <- function(city){
+  if(grepl( '\\)', city) == TRUE){
+    words <- unlist(strsplit(city, "\\("))
+    return(unlist(words[1]))
+  }
+  else{
+    return(city)
+    
+  }
+}
+
+ufo$Country <- NA
+
+ufo <- ufo[-c(3974, 74439),]
+country <- c()
+for(i in 1:nrow(ufo)){
+  
+  if(ufo[i,]$In_USA == FALSE){
+    country <- c(country, extract_country(ufo[i,]$City))
+    
+  }
+  else{
+    
+    country <- c(country, "USA")
+  }
+  
+}
+
+ufo$Country <- country
+
+ufo <- ufo %>% mutate(`City` = lapply(ufo$City, clean_city))
+ufo$City <- unlist(ufo$City)
+
+```
+
+```{r current-city-country-status}
+print(head(ufo, n=5))
+```
+
+Now we get to the biggest work to do. The `duration` column was all over the place. Here is a random selection of rows from that column:
+```{r duration-starting-point}
+print(head(ufo$Duration, n=75))
+```
+
+Clearly there was a lot to fix. Beyond the misspellings and ranges given, others were way out of left field ("milking cows" anyone?). Below is the code that turned all of these into durations on a common scale. In essence, the code massages a lot of the the corner cases and gets them all into to be numeric. there are too many corner cases to go over individually, but take a look at all the different ways people spelled "minutes" just to get a sense of how messy this column was going in:
+```{r minute-misspellings, echo=FALSE}
+print(c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
+                         "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
+                         "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
+                         "muntes", "minutue", "minets", "minuutes", "minns", "mins?", "min's", "mi",
+                         "minutes?", "min.s", "inutes", "minuetes", "min.(apprx", "mt", "minu",
+                         "min.'s", "minsutes", "mins.", "minuntes", "miniutes", "miniutes", "minutess",
+                         "minuti", "minuto", "mins-current", "minutea", "minuted", "minutes;", "minues",
+                         "minites", "minuites", "minutese", "mts", "minurtes", "mjn", "miuts", "minnutes",
+                         "mimutes", "min,maybe", "min.plus", "minq", "m", "min`s", "minute's", "minutets",
+                         "menutes", "minits", "mina", "miuntes", "min.appx", "minet", "mins,", "minitues",
+                         "min.-", "mins.approximately", "minuit", "mns", "minutestriangle", "minute's",
+                         "min.max", "minuews", "minuters", "minutes.x", "minit", "mniutes", "min,", "mintes",
+                         "mintute", "minuet", "mintes", "min-", "mim", "-minutes", "minnute", "minnute",
+                         "minuates", "mintutes", "munites", "minuates", "nin", "minugdx", "mintue", "minents",
+                         "mims", "minuits", "mnts", "mnutes", "minuteswhile", "monutes", "minutes/in",
+                         "miute", "mints", "minuter", "minuits", "minuttes", "minuttes", "minute,", "mimuta",
+                         "muinte", "minutues", "minut", "minetes", "mints", "min.bu", "miniuts",
+                         "minutes-intervals", "mln", "miniute", "miinutes", "miinutes", "miniute", ",min",
+                         "minurwa", "minutres", "miunets", "mins(approx", "minures", "miin", "nim", "minates",
+                         "imnures", "mimits", "miites", "min:s", "minuties", ",minute", "min.or", "min.approx",
+                         "munutes", "min/", "min(approx", "minutees", "min/each", "minute?", "minutis",
+                         "min/less", "mns.", "minte", "minutews", "miuets", "minutews", "minute/3", "pns",
+                         "mpns", "minute,maybe"))
+```
+
+...yeah. Below is the duration formatting code:
+```{r duration-corner-case-reduce}
+# Duration
+ufo2 <- ufo
+
+ufo2$Duration <- tolower(ufo2$Duration)
+ufo2$Duration_Raw <- ufo2$Duration
+
+# make all spaces single
+ufo2$Duration_Raw <- gsub("[[:space:]]+", " ", ufo2$Duration_Raw)
+# Remove approx versions
+ufo2$Duration_Raw <- gsub("^approx", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^aprox", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^about", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^abt", "", ufo2$Duration_Raw)
+# Remove Symbols from beginning of all strings
+ufo2$Duration_Raw <- gsub("^[[:punct:]]*", "", ufo2$Duration_Raw)
+# Remove Symbols from end as well
+ufo2$Duration_Raw <- gsub("[[:punct:]]*$", "", ufo2$Duration_Raw)
+# For ranges of time, use minimum value
+ufo2$Duration_Raw <- gsub("([0-9]+)-([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+to[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+-[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+or[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+# change digits
+ufo2$Duration_Raw <- gsub("one", "1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("two", "2", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("three", "3", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("five", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("six", "6", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("ten", "10", ufo2$Duration_Raw)
+# word approximations to digits
+ufo2$Duration_Raw <- gsub("few", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("sew", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("several", "7", ufo2$Duration_Raw)
+
+# left-over plus issue
+ufo2$Duration_Raw <- gsub("\\+", "", ufo2$Duration_Raw)
+# Add spaces if needed between number and time
+ufo2$Duration_Raw <- gsub("([0-9]+)([a-z]+)", "\\1 \\2", ufo2$Duration_Raw)
+# remove any starting spaces
+ufo2$Duration_Raw <- gsub("^[[:space:]]+", "", ufo2$Duration_Raw)
+
+# make all spaces single
+ufo2$Duration_Raw <- gsub("[[:space:]]+", " ", ufo2$Duration_Raw)
+
+```
+
+```{r duration-format-input}
+
+is_half <- function(word) {
+  if (word %in% c("half", "1/2", ".5", "0.5", "05","1/2-")) {
+    return(TRUE)
+  } else {
+    return(FALSE)
+  }
+}
+
+get_seconds_from_times <- function(times){
+  metric <- ""
+  half <- FALSE
+  
+  for(i in 2:length(times)){ #Check all other words
+    times[i] <- trimws(times[i])
+    word <- times[i]
+    
+    metric_temp <- get_time_metric(word)
+    if(metric_temp != ""){
+      metric <- metric_temp
+    } else {
+      half_temp <- is_half(word)
+      if (half_temp){
+        half <- TRUE
+      }
+    }
+  }
+  
+  multiplier <- NA
+  
+  if (metric == "second") {
+    multiplier <- 1
+  } else if (metric == "minute") {
+    multiplier <- 60
+  } else if (metric == "hour") {
+    multiplier <- 3600
+  } else if (metric =="day") {
+    multiplier <- 86400
+  } else if (metric == "week") {
+    multiplier <- 604800
+  } else if (metric == "night") {
+    multiplier <- 28800 # assume "night" is 8 hours
+  } else if (metric == "year") {
+    multiplier <- 31536000
+  } else if (metric == "month") {
+    multiplier <- 2592000
+  } else if (metric == "millisecond") {
+    multiplier <- 1/60
+  } else if (metric == "evening") {
+    multiplier <- 10800 # assume "evening" is 3 hours
+  }
+  
+  
+  if (!is.na(multiplier) && is.numeric(multiplier)){
+    result <- as.numeric(times[1])
+    if (half) {
+      result <- result + 0.5
+    }
+    result <- result * multiplier
+  } else {
+    result <- NA
+  }
+  return(result)
+}
+
+get_time_metric <- function(word) {
+  if (word %in% c("second", "seconds", "secs.", "secs", "sec.", "sec", ",seconds", "seconds,", 
+                  "s", "secopnds", "deconds", "sec's", "secomds", "seconda", "secounds", "segundos",
+                  "seconds;","seconts", "sconds", "seocds", "secodns", "seconfs", "secnds", "seonds",
+                  "secodns", "secunds", "sec.ish", "sec0", "secsonds", "secondds", "sex", "secons",
+                  "sec.s", "desonds", "secsonds", "se", "seconds(twice", "segundo", "secinds", "seckonds",
+                  "ssecs", "sc", "second-", "secconds", "secconds", "secondes", "ses", "ceconds", "secods",
+                  "sseconds", "sek", "swc", "secands", "seoonds", "senconds", "seoonds", "senconds",
+                  "secpnds", "secods", "econds", "sekonds", "seconnds", "sekonds", "secaond", "secds",
+                  "secs.,", "sec`s", "sec.'s", "seounds", "weconds", "second's", "sceonds", "secx",
+                  "segs", "secends", "secends", "secs?", "sic", "seg", "seconcs", "sce", "sec(3", "scounds",
+                  "secants", "secoconds", "secopnd", "scc", "secionds", "mseconds", "seeconds", "seconds-2",
+                  "sicets", "seceonds", "sicets")) {
+    return("second")
+  } else if (word %in% c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
+                         "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
+                         "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
+                         "muntes", "minutue", "minets", "minuutes", "minns", "mins?", "min's", "mi",
+                         "minutes?", "min.s", "inutes", "minuetes", "min.(apprx", "mt", "minu",
+                         "min.'s", "minsutes", "mins.", "minuntes", "miniutes", "miniutes", "minutess",
+                         "minuti", "minuto", "mins-current", "minutea", "minuted", "minutes;", "minues",
+                         "minites", "minuites", "minutese", "mts", "minurtes", "mjn", "miuts", "minnutes",
+                         "mimutes", "min,maybe", "min.plus", "minq", "m", "min`s", "minute's", "minutets",
+                         "menutes", "minits", "mina", "miuntes", "min.appx", "minet", "mins,", "minitues",
+                         "min.-", "mins.approximately", "minuit", "mns", "minutestriangle", "minute's",
+                         "min.max", "minuews", "minuters", "minutes.x", "minit", "mniutes", "min,", "mintes",
+                         "mintute", "minuet", "mintes", "min-", "mim", "-minutes", "minnute", "minnute",
+                         "minuates", "mintutes", "munites", "minuates", "nin", "minugdx", "mintue", "minents",
+                         "mims", "minuits", "mnts", "mnutes", "minuteswhile", "monutes", "minutes/in",
+                         "miute", "mints", "minuter", "minuits", "minuttes", "minuttes", "minute,", "mimuta",
+                         "muinte", "minutues", "minut", "minetes", "mints", "min.bu", "miniuts",
+                         "minutes-intervals", "mln", "miniute", "miinutes", "miinutes", "miniute", ",min",
+                         "minurwa", "minutres", "miunets", "mins(approx", "minures", "miin", "nim", "minates",
+                         "imnures", "mimits", "miites", "min:s", "minuties", ",minute", "min.or", "min.approx",
+                         "munutes", "min/", "min(approx", "minutees", "min/each", "minute?", "minutis",
+                         "min/less", "mns.", "minte", "minutews", "miuets", "minutews", "minute/3", "pns",
+                         "mpns", "minute,maybe")) {
+    return("minute")
+  } else if (word %in% c("hour", "hours", "H", "h", "hrs", "hrs.", "hr", "hpurs", "hous", "hours,", "hour;",
+                         "hour-ish", "hrs.or", "houres", "hr's", "hours,approx", "hhours", "houra", "hour..",
+                         "hiours", "hour/", "hrs,", "hr.", "hr,s", "houre", "h.r", "hour(approx",
+                         "hours/uncertain", "nours", "hrs,c")) {
+    return("hour")
+  } else if (word %in% c("day", "days")) {
+    return("day")
+  } else if (word %in% c("week", "weeks")) {
+    return("week")
+  } else if (word %in% c("night", "nights")) {
+    return("night") # assume "night" is 8 hours
+  } else if (word %in% c("year", "years", "yrs")) {
+    return("year")
+  } else if (word %in% c("month", "months")) {
+    return("month")
+  } else if (word %in% c("millisecond", "milliseconds", "ms")) {
+    return("millisecond")
+  } else if (word %in% c("evening", "evenings")) {
+    return("evening")
+  } else {
+    return("")
+  }
+}
+
+duration_clean_first_pass <- function(value) {
+  if (!is.na(value)) {
+    import <- strsplit(value, " ")
+    times <- paste(import[[1]], sep = " ")
+    result <- " "
+    # if the first value is just a number
+    if (suppressWarnings(!is.na(as.numeric(times[1])) & !is.na(times[2]))) {
+      # trim whitespace from items
+      times[1] <- trimws(times[1])
+      
+      result <- get_seconds_from_times(times)
+      
+      # if (half){
+      #   print('  ')
+      #   print(times)
+      #   print(metric)
+      #   print(result)
+      # }
+    } else if (value %in% c("hour", "hours", "hr")) {
+      result <- 3600 # if "hour", make 3600 seconds
+    } else if (value %in% c("short", "brief", "minute", "minutes", "minets", "less than 1 minute",
+                            "less than a minute")) {
+      result <- 60 # if "short", make 1 minute
+    } else if (value %in% c("seconds", "few seconds", "a few seconds")) {
+      result <- 10 # if "seconds", make 10 seconds
+    } else if (value %in% c("unknown", "?", "???", "not known", "unkn", "don't know", "unk", 
+                            "don't remember", "unsure", "not sure", "uncertain", "unknow", "not given",
+                            "unclear")) {
+      result <- NA
+    } else {
+      # print(times)
+      # result <- paste(times, collapse = " ")
+      result <- NA
+    }
+  }
+  else {
+    result <- NA
+  }
+  # print(result)
+  # print(result[[1]][1])
+  return(result)
+}
+
+ufo2$Duration_Cleaned <- lapply(ufo2$Duration_Raw, duration_clean_first_pass)
+
+ufo$Duration <- as.numeric(ufo2$Duration_Cleaned)
+```
+
+At this point, we have cleaned the `duration` column. We checked that we didn't introduce any new `NAs` accidentally and we were finished.
+```{r duration-finished}
+ufo2$Duration_Testing <- ufo2$Duration_Cleaned
+
+cat("Before: ", sum(is.na(ufo2$Duration_Testing)))
+
+ufo2$Duration_Testing <- as.numeric(ufo2$Duration_Cleaned)
+
+cat(" After: ", sum(is.na(ufo2$Duration_Testing)))
+```
+
+We can see now that the `duration` varied a lot across all sightings, with some lasting "all night" and others lasting a few seconds.
+```{r duration-show-summary}
+duration <- ufo2$Duration_Testing[!is.na(ufo2$Duration_Testing)]
+
+summary(duration)
+
+```
+
+Most of the sightings were under an hour, with spikes in the ranges of seconds and "5 minutes"
+```{r duration-plotting}
+duration_df <- data_frame(duration)
+duration_df_lo <- duration_df %>%
+  filter(duration < 3600)
+ggplot(duration_df_lo, aes(x = duration)) + geom_histogram(bins = 50) + ggtitle("Hour range histogram for sightings")
+
+#percentage of duration for low values
+lo_size <- dim(duration_df_lo)[1]
+total_size <- dim(duration_df)[1]
+print(sprintf("Perc. Sightings that are under 1 hour: %f", lo_size / total_size))
+
+duration_df_lo <- duration_df %>%
+  filter(duration < 600)
+ggplot(duration_df_lo, aes(x = duration)) + geom_histogram(bins = 50) + ggtitle("Sightings histogram under 10 minutes")
+
+#percentage of duration for low values
+lo_size <- dim(duration_df_lo)[1]
+total_size <- dim(duration_df)[1]
+print(sprintf("Perc. Sightings that are under 10 minutes: %f", lo_size / total_size))
+```
+
+Included in the dataset was the `summary` column that included whether the sighting was considered a hoax. the site has this to say: "We encourage visitors to our site to always be on the alert for errors and hoaxed reports, and in particular, with regard to those reports that have been submitted by parties who elect to remain anonymous.  We have attempted to label those reports that have been submitted by individuals who do not share their names or contact information together with their reports.(http://www.nuforc.org/)"
+
+We included a column to be able to differentiate between hoaxes.
+```{r hoax-add-column}
+ishoax <- function(comment){
+  
+  if(length(comment) == 0){
+    return(FALSE)
+  }
+  else{
+  splitted_com <- strsplit(comment, " ")
+  for(i in unlist(splitted_com)){
+    if(grepl("HOAX", i) | grepl("hoax", i) | grepl("Hoax", i) ){
+      return(TRUE)
+    }
+  }
+  
+  return(FALSE)
+  }
+}
+
+ufo <- ufo %>% mutate(`Hoax` = lapply(ufo$Summary, ishoax))
+ufo$Hoax <- unlist(ufo$Hoax)
+
+```
+
+Finally, since the `Shape` column had so many different kinds included, we consolidated them. We had different opinions on what bins would work well for analysis, so we included multiple versions.
+```{r shape-binning}
+bin_shape1 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("cigar","circle","cylinder","cone","crescent","disk","dome","egg","oval","round", "sphere", "teardrop")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return(shape)
+
+}
+
+bin_shape2 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("cigar","circle","cylinder","cone","crescent","disk","dome","egg","oval","round", "sphere", "teardrop")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return("Other")
+
+}
+
+bin_shape3 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("circle","cone","crescent","dome","egg","round")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return(shape)
+
+}
+
+
+ufo <- ufo %>% mutate(`Shape1` = lapply(ufo$Shape, bin_shape1))
+ufo <- ufo %>% mutate(`Shape2` = lapply(ufo$Shape, bin_shape2))
+ufo <- ufo %>% mutate(`Shape3` = lapply(ufo$Shape, bin_shape3))
+
+ufo$Shape1 <- unlist(ufo$Shape1)
+ufo$Shape2 <- unlist(ufo$Shape2)
+ufo$Shape3 <- unlist(ufo$Shape3)
+
+table(ufo$Shape)
+
+```
+
+Finally, we write the results to an new CSV and use that file in our analysis.
+```{r save-to-data-folder}
+sapply(ufo, class)
+write.csv(ufo, file = "data/ufo_clean.csv")
+```
+
+```{r final-results}
+ufo_clean <- as_tibble(read_csv("data/ufo_clean.csv"))
+summary(ufo_clean)
+```
+
+At this point, we have a clean dataset and are ready to proceed with analysis. 
+EDA material can be found in `part4_eda.rmd`

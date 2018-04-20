@@ -1,0 +1,31 @@
+---
+title: "EDAV Project: UFO Sightings"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+date: "4/5/2018"
+output: html_document
+---
+
+# 1 Introduction
+TODO
+*Explain why you chose this topic, and the questions you are interested in studying.*
+*List team members and a description of how each contributed to the project.*
+Notes:
+- We wanted to pick a dataset that was fun
+- UFO Sightings was a perfect fit
+- Interested in what people talk about in a sighting what they say they see
+
+# 2 Description of Data
+*Describe how the data was collected, how you accessed it, and any other noteworthy features.*
+
+Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. 
+
+The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
+
+Data Scraping
+We developed a python script to scrape the data from http://www.nuforc.org/webreports/. There is one index page for each month that contains links to detailed description of each UFO sighting. Using a html parsing package named BeautifulSoup, the script goes through each of these links to extract the data fields including date/time of observation, shape, city, state, duration, and full description. The source code can be found ____________.
+
+Two-word affinity
+We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be found ___________.
+
+# 3 Analysis of Data Quality
+*Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
