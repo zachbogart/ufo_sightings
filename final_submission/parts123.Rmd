@@ -17,7 +17,7 @@ Notes:
 # 2 Description of Data
 *Describe how the data was collected, how you accessed it, and any other noteworthy features.*
 
-Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. 
+Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. The NUFORC is headquartered in Davenport, WA (East Washington). 
 
 The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
 
@@ -26,6 +26,15 @@ We developed a python script to scrape the data from http://www.nuforc.org/webre
 
 Two-word affinity
 We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be found ___________.
+
+External Dataset
+To better explore our theories behind UFO sighting locations, we used several external datasets. Our data for how many hours a day people at the state level spend on Sports, Exercise, and Recreation and the percentage of people in a state that engaged in sports or exercise in a given day came from the American Time Use Survey. The ATUS is conducted by the Bureau of Labor Statistics. The data in the survey we used was collected from 2009-2015 via phone interviews in which interviewees were asked to recount the activities of their day. http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html
+https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm
+
+Our data on state level obesity came from https://stateofobesity.org/adult-obesity/, an American watchdog organization on obesity in the United States. State of Obesity received their data from the CDC’s Behavioral Risk Factor Surveillance System dataset, a cross sectional study conducted over the phone. 
+https://stateofobesity.org/adult-obesity/
+
+The results by state of the 2016 election were accessed from https://www.politico.com/mapdata-2016/2016-election/results/map/president/ . 
 
 # 3 Analysis of Data Quality
 *Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
