@@ -88,6 +88,25 @@ print(table(ufo$State))
 print(sprintf("Number of States: %d", dim(table(ufo$State))))
 ```
 
+```{r}
+clean_state <- function(state){
+  if (is.na(state)) {
+    return(NA)
+  }
+  if(state == "Ca"){
+    return("CA")
+  }
+  if(state == "Fl"){
+    return("FL")
+  }
+  return(state)
+}
+
+ufo$State = lapply(ufo$State, clean_state)
+ufo$State = unlist(ufo$State)
+```
+
+
 To differentiate USA from non-USA states, we added a column to signify if the sighting occurred in one of the fifty US states or not.
 ```{r}
 #Add In USA Column

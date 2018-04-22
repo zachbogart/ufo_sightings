@@ -1,9 +1,17 @@
 ---
-title: "Final_Writeup"
+title: "EDAV Project: UFO Sightings"
 author: "The Crew"
 date: "4/5/2018"
 output: html_document
 ---
+
+# 1 Introduction
+TODO
+*Explain why you chose this topic, and the questions you are interested in studying.*
+*List team members and a description of how each contributed to the project.*
+
+# 2 Description of Data
+*Describe how the data was collected, how you accessed it, and any other noteworthy features.*
 
 Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. 
 
@@ -16,6 +24,10 @@ Two-word affinity
 We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be found ___________.
 
 
+
+# 3 Analysis of Data Quality
+*Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
+
 ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
 knitr::opts_chunk$set(warning = FALSE,
@@ -24,16 +36,614 @@ knitr::opts_chunk$set(warning = FALSE,
 
 library(Sleuth3)
 library(tidyverse)
-# library(GGally)
+
 library(DAAG)
-# library(car)
+
 library(vcd)
-# library(tidyquant)
-# library(ggmosaic)
+
 library(ggplot2)
 library(extracat)
 library(scales)
+library(micromapST)
+library(statebins)
+library(lubridate)
 ```
+
+The dataset was scraped from the [National UFO Reporting Center](http://www.nuforc.org/). Initially, the data was quite disorganized. Here is a look at the raw data. Before reading in the data, we considered `unknown` to be considered as an `NA` value. There were two observations (row number 3974, 74439) that did not work with our data cleaning process due to it's strange formating. 
+
+```{r}
+ufo <- as_tibble(read_csv("ufo_data.csv", na=c('unknown', '', 'Unknown')))
+#Bad Eggs
+ufo <- ufo[-c(3974, 74439),]
+print(head(ufo, n=5))
+```
+
+An easy fix is to correct the date formats. We converted the `Posted` column to a standard date format.
+```{r}
+#Posted
+ufo$Posted <- as.Date(ufo$Posted, format = "%m/%d/%y")
+```
+
+And we converted the `Date / Time` into separate columns for easier access:
+```{r}
+#Add Date and Time
+getDateFromDateTime <- function(dateTimeString, year){
+  date <- strsplit(dateTimeString, " ")[[1]][1]
+  elements <- strsplit(date, "/")[[1]]
+  dateFinal <- paste(c(elements[1], elements[2], year), collapse="/")
+  return(dateFinal)
+}
+
+getTimeFromDateTime <- function(dateTimeString){
+  # return(dateTimeString)
+  time <- strsplit(dateTimeString, " ")[[1]][2]
+  return(time)
+}
+
+ufo <- ufo %>%
+  rowwise() %>%
+  mutate(
+    Date = as.Date(getDateFromDateTime(`Date / Time`, `year`), format = "%m/%d/%Y"),
+    Time = getTimeFromDateTime(`Date / Time`)
+  )
+
+print(head(ufo, n=5))
+```
+
+The `Shape` column had a lot of different results. As a quick pass, we merged some results that were just different tenses of the same word:
+```{r}
+print("Before")
+print(table(ufo$Shape))
+```
+
+
+```{r}
+#Clean Shape
+ufo$Shape <- tolower(ufo$Shape)
+ufo$Shape[ufo$Shape == "triangular"] <- "triangle"
+ufo$Shape[ufo$Shape == "changed"] <- "changing"
+
+print("After")
+print(table(ufo$Shape))
+```
+
+Next, the `State` column contained many states that were actually not US States such as Ontario, Canada. Notice how the number of states is much larger than 50:
+```{r}
+print(table(ufo$State))
+print(sprintf("Number of States: %d", dim(table(ufo$State))))
+```
+
+```{r}
+clean_state <- function(state){
+  if (is.na(state)) {
+    return(NA)
+  }
+  if(state == "Ca"){
+    return("CA")
+  }
+  if(state == "Fl"){
+    return("FL")
+  }
+  return(state)
+}
+
+ufo$State = lapply(ufo$State, clean_state)
+ufo$State = unlist(ufo$State)
+```
+
+
+To differentiate USA from non-USA states, we added a column to signify if the sighting occurred in one of the fifty US states or not.
+```{r}
+#Add In USA Column
+in_usa <- function(value) {
+  states <- c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DC", "DE", "FL", "GA", 
+              "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+              "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+              "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+              "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+  if (value %in% states) {
+    return(TRUE)
+  }
+  else {
+    return(FALSE)
+  }
+}
+
+ufo <- ufo %>%
+  mutate(
+      In_USA = in_usa(`State`)
+    )
+
+print(head(ufo, n=5))
+```
+
+
+Next was extracting the country from the `City` column. Many of the rows had the country in the `City` column in parentheses, usually if it was international. To do this, we wrote a function that grabbed the value inside the parentheses and checked if it was a valid country. After this, we had access to different countries and cities where the sightings occurred.
+```{r}
+
+library(maps)
+
+world <- map("world", plot=FALSE)
+
+extract_country <- function(city){
+  
+if(is.na(city)){
+  return(NA)
+}
+  
+else if(grepl( '\\)', city) == TRUE){
+  words <- unlist(strsplit(city, "\\("))
+  potential_country <- substr(words[2], 1, nchar(words[2])-1) 
+  if(potential_country %in% world$names)
+    return(potential_country)
+  else{
+    return(NA)
+  }
+
+  }
+else{
+    return(NA)
+  }
+}
+
+clean_city <- function(city){
+  if(grepl( '\\)', city) == TRUE){
+    words <- unlist(strsplit(city, "\\("))
+    return(unlist(words[1]))
+  }
+  else{
+    return(city)
+    
+  }
+}
+
+ufo$Country <- NA
+
+ufo <- ufo[-c(3974, 74439),]
+country <- c()
+for(i in 1:nrow(ufo)){
+  
+  if(ufo[i,]$In_USA == FALSE){
+    country <- c(country, extract_country(ufo[i,]$City))
+    
+  }
+  else{
+    
+    country <- c(country, "USA")
+  }
+  
+}
+
+ufo$Country <- country
+
+ufo <- ufo %>% mutate(`City` = lapply(ufo$City, clean_city))
+ufo$City <- unlist(ufo$City)
+
+```
+
+```{r}
+print(head(ufo, n=5))
+```
+
+
+```{r echo=FALSE}
+# ufo$Time <- getTimeFromDateTime(ufo$`Date / Time`)
+# ufo$Date <- getDateFromDateTime(ufo$`Date / Time`, ufo$`year`)
+# ufo$dts2 <- as.POSIXct(ufo$Time, format = "%H:%M:%S")
+# ufo$dts3 <- as.POSIXlt(ufo$Time, format = "%H:%M:%S")
+# ufo$dts4 <- as.POSIXlt(ufo$DateRaw, format = "%Y-%m-%d")
+# 
+# ufo
+```
+
+
+Now we get to the biggest work to do. The `duration` column was all over the place. Here is a random selection of rows from that column:
+```{r}
+print(head(ufo$Duration, n=75))
+```
+Clearly there was a lot to fix. Beyond the misspellings and ranges given, others were way out of left field ("milking cows" anyone?). Below is the code that turned all of these into durations on a common scale. In essence, the code massages a lot of the the corner cases and gets them all into to be numeric. there are too many corner cases to go over individually, but take a look at all the different ways people spelled "minutes" just to get a sense of how messy this column was going in:
+```{r echo=FALSE}
+print(c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
+                         "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
+                         "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
+                         "muntes", "minutue", "minets", "minuutes", "minns", "mins?", "min's", "mi",
+                         "minutes?", "min.s", "inutes", "minuetes", "min.(apprx", "mt", "minu",
+                         "min.'s", "minsutes", "mins.", "minuntes", "miniutes", "miniutes", "minutess",
+                         "minuti", "minuto", "mins-current", "minutea", "minuted", "minutes;", "minues",
+                         "minites", "minuites", "minutese", "mts", "minurtes", "mjn", "miuts", "minnutes",
+                         "mimutes", "min,maybe", "min.plus", "minq", "m", "min`s", "minute's", "minutets",
+                         "menutes", "minits", "mina", "miuntes", "min.appx", "minet", "mins,", "minitues",
+                         "min.-", "mins.approximately", "minuit", "mns", "minutestriangle", "minute's",
+                         "min.max", "minuews", "minuters", "minutes.x", "minit", "mniutes", "min,", "mintes",
+                         "mintute", "minuet", "mintes", "min-", "mim", "-minutes", "minnute", "minnute",
+                         "minuates", "mintutes", "munites", "minuates", "nin", "minugdx", "mintue", "minents",
+                         "mims", "minuits", "mnts", "mnutes", "minuteswhile", "monutes", "minutes/in",
+                         "miute", "mints", "minuter", "minuits", "minuttes", "minuttes", "minute,", "mimuta",
+                         "muinte", "minutues", "minut", "minetes", "mints", "min.bu", "miniuts",
+                         "minutes-intervals", "mln", "miniute", "miinutes", "miinutes", "miniute", ",min",
+                         "minurwa", "minutres", "miunets", "mins(approx", "minures", "miin", "nim", "minates",
+                         "imnures", "mimits", "miites", "min:s", "minuties", ",minute", "min.or", "min.approx",
+                         "munutes", "min/", "min(approx", "minutees", "min/each", "minute?", "minutis",
+                         "min/less", "mns.", "minte", "minutews", "miuets", "minutews", "minute/3", "pns",
+                         "mpns", "minute,maybe"))
+```
+...yeah.
+
+```{r}
+# Duration
+ufo2 <- ufo
+
+ufo2$Duration <- tolower(ufo2$Duration)
+ufo2$Duration_Raw <- ufo2$Duration
+
+# make all spaces single
+ufo2$Duration_Raw <- gsub("[[:space:]]+", " ", ufo2$Duration_Raw)
+# Remove approx versions
+ufo2$Duration_Raw <- gsub("^approx", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^aprox", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^about", "", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("^abt", "", ufo2$Duration_Raw)
+# Remove Symbols from beginning of all strings
+ufo2$Duration_Raw <- gsub("^[[:punct:]]*", "", ufo2$Duration_Raw)
+# Remove Symbols from end as well
+ufo2$Duration_Raw <- gsub("[[:punct:]]*$", "", ufo2$Duration_Raw)
+# For ranges of time, use minimum value
+ufo2$Duration_Raw <- gsub("([0-9]+)-([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+to[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+-[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("([0-9]+)[[:space:]]+or[[:space:]]+([0-9]+)", "\\1", ufo2$Duration_Raw)
+# change digits
+ufo2$Duration_Raw <- gsub("one", "1", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("two", "2", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("three", "3", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("five", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("six", "6", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("ten", "10", ufo2$Duration_Raw)
+# word approximations to digits
+ufo2$Duration_Raw <- gsub("few", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("sew", "5", ufo2$Duration_Raw)
+ufo2$Duration_Raw <- gsub("several", "7", ufo2$Duration_Raw)
+
+# left-over plus issue
+ufo2$Duration_Raw <- gsub("\\+", "", ufo2$Duration_Raw)
+# Add spaces if needed between number and time
+ufo2$Duration_Raw <- gsub("([0-9]+)([a-z]+)", "\\1 \\2", ufo2$Duration_Raw)
+# remove any starting spaces
+ufo2$Duration_Raw <- gsub("^[[:space:]]+", "", ufo2$Duration_Raw)
+
+# make all spaces single
+ufo2$Duration_Raw <- gsub("[[:space:]]+", " ", ufo2$Duration_Raw)
+
+```
+
+```{r}
+
+is_half <- function(word) {
+  if (word %in% c("half", "1/2", ".5", "0.5", "05","1/2-")) {
+    return(TRUE)
+  } else {
+    return(FALSE)
+  }
+}
+
+get_seconds_from_times <- function(times){
+  metric <- ""
+  half <- FALSE
+  
+  for(i in 2:length(times)){ #Check all other words
+    times[i] <- trimws(times[i])
+    word <- times[i]
+    
+    metric_temp <- get_time_metric(word)
+    if(metric_temp != ""){
+      metric <- metric_temp
+    } else {
+      half_temp <- is_half(word)
+      if (half_temp){
+        half <- TRUE
+      }
+    }
+  }
+  
+  multiplier <- NA
+  
+  if (metric == "second") {
+    multiplier <- 1
+  } else if (metric == "minute") {
+    multiplier <- 60
+  } else if (metric == "hour") {
+    multiplier <- 3600
+  } else if (metric =="day") {
+    multiplier <- 86400
+  } else if (metric == "week") {
+    multiplier <- 604800
+  } else if (metric == "night") {
+    multiplier <- 28800 # assume "night" is 8 hours
+  } else if (metric == "year") {
+    multiplier <- 31536000
+  } else if (metric == "month") {
+    multiplier <- 2592000
+  } else if (metric == "millisecond") {
+    multiplier <- 1/60
+  } else if (metric == "evening") {
+    multiplier <- 10800 # assume "evening" is 3 hours
+  }
+  
+  
+  if (!is.na(multiplier) && is.numeric(multiplier)){
+    result <- as.numeric(times[1])
+    if (half) {
+      result <- result + 0.5
+    }
+    result <- result * multiplier
+  } else {
+    result <- NA
+  }
+  return(result)
+}
+
+get_time_metric <- function(word) {
+  if (word %in% c("second", "seconds", "secs.", "secs", "sec.", "sec", ",seconds", "seconds,", 
+                  "s", "secopnds", "deconds", "sec's", "secomds", "seconda", "secounds", "segundos",
+                  "seconds;","seconts", "sconds", "seocds", "secodns", "seconfs", "secnds", "seonds",
+                  "secodns", "secunds", "sec.ish", "sec0", "secsonds", "secondds", "sex", "secons",
+                  "sec.s", "desonds", "secsonds", "se", "seconds(twice", "segundo", "secinds", "seckonds",
+                  "ssecs", "sc", "second-", "secconds", "secconds", "secondes", "ses", "ceconds", "secods",
+                  "sseconds", "sek", "swc", "secands", "seoonds", "senconds", "seoonds", "senconds",
+                  "secpnds", "secods", "econds", "sekonds", "seconnds", "sekonds", "secaond", "secds",
+                  "secs.,", "sec`s", "sec.'s", "seounds", "weconds", "second's", "sceonds", "secx",
+                  "segs", "secends", "secends", "secs?", "sic", "seg", "seconcs", "sce", "sec(3", "scounds",
+                  "secants", "secoconds", "secopnd", "scc", "secionds", "mseconds", "seeconds", "seconds-2",
+                  "sicets", "seceonds", "sicets")) {
+    return("second")
+  } else if (word %in% c("minute", "minutes", "min", "min.", "nins", "mins", "minutes.", 
+                         "minutew", "minuets", "minuts", "minutes,", "minutos", "miutes",
+                         "mint", "mintues", "ninutes", "minustes", "mn", "mis", "mini", 
+                         "muntes", "minutue", "minets", "minuutes", "minns", "mins?", "min's", "mi",
+                         "minutes?", "min.s", "inutes", "minuetes", "min.(apprx", "mt", "minu",
+                         "min.'s", "minsutes", "mins.", "minuntes", "miniutes", "miniutes", "minutess",
+                         "minuti", "minuto", "mins-current", "minutea", "minuted", "minutes;", "minues",
+                         "minites", "minuites", "minutese", "mts", "minurtes", "mjn", "miuts", "minnutes",
+                         "mimutes", "min,maybe", "min.plus", "minq", "m", "min`s", "minute's", "minutets",
+                         "menutes", "minits", "mina", "miuntes", "min.appx", "minet", "mins,", "minitues",
+                         "min.-", "mins.approximately", "minuit", "mns", "minutestriangle", "minute's",
+                         "min.max", "minuews", "minuters", "minutes.x", "minit", "mniutes", "min,", "mintes",
+                         "mintute", "minuet", "mintes", "min-", "mim", "-minutes", "minnute", "minnute",
+                         "minuates", "mintutes", "munites", "minuates", "nin", "minugdx", "mintue", "minents",
+                         "mims", "minuits", "mnts", "mnutes", "minuteswhile", "monutes", "minutes/in",
+                         "miute", "mints", "minuter", "minuits", "minuttes", "minuttes", "minute,", "mimuta",
+                         "muinte", "minutues", "minut", "minetes", "mints", "min.bu", "miniuts",
+                         "minutes-intervals", "mln", "miniute", "miinutes", "miinutes", "miniute", ",min",
+                         "minurwa", "minutres", "miunets", "mins(approx", "minures", "miin", "nim", "minates",
+                         "imnures", "mimits", "miites", "min:s", "minuties", ",minute", "min.or", "min.approx",
+                         "munutes", "min/", "min(approx", "minutees", "min/each", "minute?", "minutis",
+                         "min/less", "mns.", "minte", "minutews", "miuets", "minutews", "minute/3", "pns",
+                         "mpns", "minute,maybe")) {
+    return("minute")
+  } else if (word %in% c("hour", "hours", "H", "h", "hrs", "hrs.", "hr", "hpurs", "hous", "hours,", "hour;",
+                         "hour-ish", "hrs.or", "houres", "hr's", "hours,approx", "hhours", "houra", "hour..",
+                         "hiours", "hour/", "hrs,", "hr.", "hr,s", "houre", "h.r", "hour(approx",
+                         "hours/uncertain", "nours", "hrs,c")) {
+    return("hour")
+  } else if (word %in% c("day", "days")) {
+    return("day")
+  } else if (word %in% c("week", "weeks")) {
+    return("week")
+  } else if (word %in% c("night", "nights")) {
+    return("night") # assume "night" is 8 hours
+  } else if (word %in% c("year", "years", "yrs")) {
+    return("year")
+  } else if (word %in% c("month", "months")) {
+    return("month")
+  } else if (word %in% c("millisecond", "milliseconds", "ms")) {
+    return("millisecond")
+  } else if (word %in% c("evening", "evenings")) {
+    return("evening")
+  } else {
+    return("")
+  }
+}
+
+duration_clean_first_pass <- function(value) {
+  if (!is.na(value)) {
+    import <- strsplit(value, " ")
+    times <- paste(import[[1]], sep = " ")
+    result <- " "
+    # if the first value is just a number
+    if (suppressWarnings(!is.na(as.numeric(times[1])) & !is.na(times[2]))) {
+      # trim whitespace from items
+      times[1] <- trimws(times[1])
+      
+      result <- get_seconds_from_times(times)
+      
+      # if (half){
+      #   print('  ')
+      #   print(times)
+      #   print(metric)
+      #   print(result)
+      # }
+    } else if (value %in% c("hour", "hours", "hr")) {
+      result <- 3600 # if "hour", make 3600 seconds
+    } else if (value %in% c("short", "brief", "minute", "minutes", "minets", "less than 1 minute",
+                            "less than a minute")) {
+      result <- 60 # if "short", make 1 minute
+    } else if (value %in% c("seconds", "few seconds", "a few seconds")) {
+      result <- 10 # if "seconds", make 10 seconds
+    } else if (value %in% c("unknown", "?", "???", "not known", "unkn", "don't know", "unk", 
+                            "don't remember", "unsure", "not sure", "uncertain", "unknow", "not given",
+                            "unclear")) {
+      result <- NA
+    } else {
+      # print(times)
+      # result <- paste(times, collapse = " ")
+      result <- NA
+    }
+  }
+  else {
+    result <- NA
+  }
+  # print(result)
+  # print(result[[1]][1])
+  return(result)
+}
+
+ufo2$Duration_Cleaned <- lapply(ufo2$Duration_Raw, duration_clean_first_pass)
+
+ufo$Duration <- as.numeric(ufo2$Duration_Cleaned)
+```
+
+At this point, we have cleaned the `duration` column. We checked that we didn't introduce any new `NAs` accidentally and we were finished.
+```{r}
+ufo2$Duration_Testing <- ufo2$Duration_Cleaned
+
+cat("Before: ", sum(is.na(ufo2$Duration_Testing)))
+
+ufo2$Duration_Testing <- as.numeric(ufo2$Duration_Cleaned)
+
+cat(" After: ", sum(is.na(ufo2$Duration_Testing)))
+
+#Start-- Before:  4686 After:  13853
+#More than 2nd word-- Before:  4676 After:  13018
+#More words-- Before:  4676 After:  12317
+#Done-- Before:  4676 After:  12275
+```
+
+We can see now that the `duration` varied a lot across all sightings, with some lasting "all night" and others lasting a few seconds.
+```{r}
+duration <- ufo2$Duration_Testing[!is.na(ufo2$Duration_Testing)]
+
+summary(duration)
+
+# str(unique(ufo2$Duration_Cleaned))
+
+```
+
+Most of the sightings were under an hour, with spikes in the ranges of seconds and "5 minutes"
+```{r}
+duration_df <- data_frame(duration)
+duration_df_lo <- duration_df %>%
+  filter(duration < 3600)
+ggplot(duration_df_lo, aes(x = duration)) + geom_histogram(bins = 50) + ggtitle("Hour range for sightings")
+
+#percentage of duration for low values
+lo_size <- dim(duration_df_lo)[1]
+total_size <- dim(duration_df)[1]
+print(sprintf("Perc. Sightings that are under 1 hour: %f", lo_size / total_size))
+
+duration_df_lo <- duration_df %>%
+  filter(duration < 600)
+ggplot(duration_df_lo, aes(x = duration)) + geom_histogram(bins = 50) + ggtitle("Sightings under 10 minutes")
+
+#percentage of duration for low values
+lo_size <- dim(duration_df_lo)[1]
+total_size <- dim(duration_df)[1]
+print(sprintf("Perc. Sightings that are under 10 minutes: %f", lo_size / total_size))
+```
+
+Included in the dataset was the `summary` column that included whether the sighting was considered a hoax. the site has this to say: "We encourage visitors to our site to always be on the alert for errors and hoaxed reports, and in particular, with regard to those reports that have been submitted by parties who elect to remain anonymous.  We have attempt to label those reports that have been submitted by individuals who do not share their names or contact information together with their reports.(http://www.nuforc.org/)"
+
+We included a column to be able to differentiate between hoaxes.
+```{r}
+ishoax <- function(comment){
+  
+  if(length(comment) == 0){
+    return(FALSE)
+  }
+  else{
+  splitted_com <- strsplit(comment, " ")
+  for(i in unlist(splitted_com)){
+    if(grepl("HOAX", i) | grepl("hoax", i) | grepl("Hoax", i) ){
+      return(TRUE)
+    }
+  }
+  
+  return(FALSE)
+  }
+}
+
+ufo <- ufo %>% mutate(`Hoax` = lapply(ufo$Summary, ishoax))
+ufo$Hoax <- unlist(ufo$Hoax)
+
+```
+
+Finally, since the `Shape` column had so many different kinds included. We had different takes on what the bins would work well for analysis.
+```{r}
+bin_shape1 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("cigar","circle","cylinder","cone","crescent","disk","dome","egg","oval","round", "sphere", "teardrop")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return(shape)
+
+}
+
+bin_shape2 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("cigar","circle","cylinder","cone","crescent","disk","dome","egg","oval","round", "sphere", "teardrop")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return("Other")
+
+}
+
+bin_shape3 <- function(shape){
+  if(shape %in% c("hexagon", "rectangle", "diamond")){
+    return("Rectangle")
+  }
+  else if(shape %in% c("chevron", "delta", "pyramid", "triangle")){
+    return("Triangle")
+  }
+  else if(shape %in% c("circle","cone","crescent","dome","egg","round")){
+    return("Circle")
+  }
+  else if(shape %in% c("fireball", "flare", "flash", "light")){
+    return("Light")
+  }
+  return(shape)
+
+}
+
+
+ufo <- ufo %>% mutate(`Shape1` = lapply(ufo$Shape, bin_shape1))
+ufo <- ufo %>% mutate(`Shape2` = lapply(ufo$Shape, bin_shape2))
+ufo <- ufo %>% mutate(`Shape3` = lapply(ufo$Shape, bin_shape3))
+
+ufo$Shape1 <- unlist(ufo$Shape1)
+ufo$Shape2 <- unlist(ufo$Shape2)
+ufo$Shape3 <- unlist(ufo$Shape3)
+
+table(ufo$Shape)
+
+```
+
+Finally, we write the results to an new CSV and use that file in our analysis.
+```{r}
+sapply(ufo, class)
+write.csv(ufo, file = "ufo_clean.csv")
+```
+
+```{r}
+ufo_clean <- as_tibble(read_csv("ufo_clean.csv"))
+ufo_clean 
+```
+
+# 4 Main Analysis
 
 ```{r}
 ufo <- as_tibble(read_csv("ufo_clean.csv"))
@@ -47,6 +657,8 @@ trump_state <- as_tibble(read_csv("TrumpState.csv"))
 
 obese <- as_tibble(read_csv("Obesity.csv"))
 
+ufo <- ufo %>%
+  mutate(Shape2 = fct_relevel(Shape2, "Circle", "Light", "Triangle", "Rectangle", "Other"))
 ```
 
 ```{r}
@@ -59,13 +671,17 @@ summarize(num = n(), num_na = sum(is.na(`Duration`))) %>%
 mutate(percent_na = round(num_na/num, 2)) %>%
 arrange(-percent_na)
 percent_missing
+```
 
+```{r}
 percent_missing <- ufo %>% group_by(`In_USA`) %>%
 summarize(num = n(), num_na = sum(is.na(`Shape`))) %>%
 mutate(percent_na = round(num_na/num, 2)) %>%
 arrange(-percent_na)
 percent_missing
+```
 
+```{r}
 percent_missing <- ufo %>% group_by(`Shape1`) %>%
 summarize(num = n(), num_na = sum(is.na(`Duration`))) %>%
 mutate(percent_na = round(num_na/num, 2)) %>%
@@ -76,9 +692,9 @@ percent_missing
 ```{r}
 table(ufo$State)
 USA_ufo <- ufo %>% filter(In_USA == TRUE & is.na(Shape2) == FALSE)
-ggplot(USA_ufo, aes(x = State, fill = Shape2)) + 
-    geom_bar()
+```
 
+```{r}
 bin_duration <- function(duration){
   
   if(is.na(duration) == TRUE){
@@ -86,58 +702,94 @@ bin_duration <- function(duration){
   }
   
   if(duration < 60){
-    return("Less than a Minute")
+    return("< 1")
   }
   else if(duration < 300){
-    return("Between 1 and 5 minutes")
+    return("1 - 5")
     
   }
   else if(duration < 600){
     
-    return("Between 5 and 10 minutes")
+    return("5 - 10")
   }
   
   else if(duration < 1800){
-    return("Between 10 and 30 minutes")
+    return("10 - 30")
   }
   
   else if (duration < 3600){
-    return("Between 30 minutes and an Hour")
+    return("30 - 60")
   }
   else{
-    return("More than an Hour")
+    return("60+")
   }
   return(NA)
   
 }
+```
 
 
-
+```{r}
 ufo <- ufo %>% mutate(`Bin_Dur` = lapply(ufo$Duration, bin_duration))
 ufo$Bin_Dur <- unlist(ufo$Bin_Dur)
 ufo <- ufo %>%
-  mutate(Bin_Dur = fct_relevel(Bin_Dur, "Less than a Minute", "Between 1 and 5 minutes", "Between 5 and 10 minutes", "Between 10 and 30 minutes", "Between 30 minutes and an Hour", "More than an Hour"))
+  mutate(Bin_Dur = fct_relevel(Bin_Dur, "< 1", "1 - 5", "5 - 10", "10 - 30", "30 - 60", "60+"))
+
+
+```
+
+As we can see with the last graph, there is a clear increase in sightings since the increased availability of the internet. 
+
+```{r}
+ggplot(ufo, aes(x = year)) + geom_bar()
+ufo1950 <- ufo %>% filter(year>=1950)
+ggplot(ufo1950, aes(x = year)) + geom_bar()
+```
+
+
+As seen below, the most frequent shape of observations in the data are circular shaped observations with light as a close second. 
+
+```{r}
+ggplot(ufo, aes(x = Shape2)) + geom_bar()
+```
+
+Most of the sightings in the dataset are fairly short (between seconds and 5 minutes); however, there are a significant amount of sightings of all durations. 
+
+```{r}
+ggplot(ufo, aes(x = Bin_Dur)) + geom_bar() + labs(x = "Duration in Minutes", y = "Number of Sightings")
 ```
 
 ```{r}
-ggplot(ufo, aes(x = Bin_Dur, fill = Shape2)) + geom_bar(position = "fill")
+ufodurclip <- ufo %>% filter(is.na(Duration) == FALSE & Duration <= 3600)
+ggplot(ufodurclip, aes(x = Duration)) + geom_histogram()
+```
+
+
+We're going to need to control for population, as most of the most popular states (California) have large numbers of sightings due to it's size. 
+
+```{r}
+ufostate <- ufo %>% filter(is.na(State) == FALSE & In_USA == TRUE)
+ggplot(ufostate, aes(x = State)) + geom_bar()
+```
+
+```{r}
+internationalufo <- ufo %>% filter(In_USA == FALSE & is.na(Country) == FALSE)
+ggplot(internationalufo, aes(x = Country)) + geom_bar()
+table(internationalufo$Country)
+```
+
+In this graph it's hard to see, but the overal distribution of shapes and duration of sighting is fairly constant. 
+
+```{r}
+ufo <- ufo %>% filter(is.na(Bin_Dur) == FALSE)
+ggplot(ufo, aes(x = Bin_Dur, fill = Shape2)) + geom_bar(position = "fill") + labs(x = "Duration of Sighting", y = "Proportion") + ggtitle("Proportion of Sightings by Shape by Duration of Sighting")+ guides(fill=guide_legend(title="Shape"))
 
 ```
 
 ```{r}
 ggplot(ufo, aes(x = Bin_Dur, fill = Shape2)) +
-  geom_bar(position = "dodge") 
+  geom_bar() + facet_wrap(~Shape2)
 
-```
-
-```{r}
-ggplot(ufo, aes(x = Bin_Dur, y = ..prop.., fill = Shape2)) +
-geom_bar(position = 'dodge')
-
-```
-
-```{r}
-ggplot(ufo, aes(x=Bin_Dur, y = ..prop..)) + geom_bar(aes(fill = Shape2), position = "dodge")
 ```
 
 ```{r}
@@ -149,12 +801,39 @@ durshape$prop <- durshape$durshapefreq/durshape$durfreq
 ggplot(durshape, aes(x = Bin_Dur, y = prop, fill = Shape2)) + geom_bar(position = "dodge", stat = "identity")
 ```
 
+We can easily see in this graph, that the proportion of sightings for each duration is fairly constant. The only trend is a slight decrease in Triangular shaped sightings as duration increases and an increase in other as the duration increases. 
+
+```{r}
+ggplot(durshape, aes(x = Bin_Dur, y = prop, fill = Shape2)) +
+  geom_bar(stat = "identity") + facet_wrap(~Shape2)
+```
+
+```{r}
+
+ggplot(ufodurclip, aes(Duration, fill = Shape2)) + geom_histogram() + facet_wrap(~Shape2)
+
+```
+
+Again, it appears that the distribution of shapes of sightings for each state seems to be fairly constant. 
 
 ```{r}
 ggplot(USA_ufo, aes(x = State, fill = Shape2)) + geom_bar(position = "fill")
+```
+
+It's difficult to see in this graph, but it looks as if the states that have the highest sightings per 10,000 residents are somewhat suprising: WA, VT, MT, AK, OR, and ME. First of all, 4 of these states are on the coast. Secondly, there seems to be a west coast bias to the states. This makes sense as the headquarters of NUFORC is in CA. Thirdly, all of these states are fairly rural, but in a different way from how Texas is rural. People in all of these states tend to be fairly outdoorsy, versus states like Alabama, Texas, and Georgia, where people tend to stay inside as much as they can and obesity rates are higher. It might be a weak conclusion, but UFO sightings might be correlated with the amount of time that people spend outside. We will use 3 different proxies: Hours a day spent doing Sports, Excercise, and Recreation, Percentage of Population Engaged in Sports and Recreation daily, and Obesity rate. As there is no measure for how much time people spend outside, we believe that most people are outside to excercise and these 3 proxies are at the least correlated with outdoor activity. Because all of our 3 proxies come to similar conclusions, we feel that there is a certain robustness to our seemingly trivial result. 
+
+```{r}
 USA_ufo <- merge(USA_ufo, state_pops, by = "State")
-USA_ufo_summary <- USA_ufo %>% group_by(State, Shape2, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
-ggplot(USA_ufo_summary, aes(x = State, y = Prop, fill = Shape2)) + geom_bar(stat = "identity") + labs(y = "Sightings per 10,000 Residents")
+USA_ufo_summary <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Shape2, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+ggplot(USA_ufo_summary, aes(x = reorder(State, -Prop), y = Prop, fill = Shape2)) + geom_bar(stat = "identity") + labs(y = "Sightings per 10,000 Residents")
+
+```
+
+
+```{r}
+temp5 <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+temp5$state <- temp5$State
+statebins(temp5, value_col = "Prop", text_color =  "black", font_size = 3, legend_title = "Sightings Per 10,000 Residents", legend_position =  "bottom")
 
 ```
 
@@ -163,16 +842,13 @@ https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm
 
 
 ```{r}
-USA_ufo_summary2 <- USA_ufo %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary2 <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
 USA_ufo_summary2 <- merge(USA_ufo_summary2, excer, by = "State")
 ggplot(USA_ufo_summary2, aes(x = ATUS, y = Prop)) + geom_point(stat = "identity") + labs(x = "Hours a day spent doing Sports, Excercise, Recreation", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State)+ geom_smooth(method='lm',formula=y~x)
-ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
-
 ```
 
 ```{r}
-USA_ufo_summary2 <- merge(USA_ufo_summary2, trump_state, by = "State")
-ggplot(USA_ufo_summary2, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
+ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
 
 ```
 
@@ -184,21 +860,35 @@ ggplot(USA_ufo_summary2, aes(x = Obesity, y = Prop)) + geom_point(stat = "identi
 
 ```
 
+We wanted to see if other state-by-state features were correlated with sightings per 10,000 residents. One of the most interesting was to see if political affiliation would be correlated with sightings per 10,000 residents. As we can see here, there seems to be a slight negative trend with Donald Trump's 2016 election margin by state. The data in first graph is from 1995, but when we limit it to since 2014 (electoral map has essentially looked the same since 2014) the trend looks essentially the same. In our opinion, we find it much more likely that Trump voters are much more likely to not go outside.  
 
 ```{r}
-Int_ufo <- ufo %>% filter(In_USA == FALSE & is.na(Shape2) == FALSE)
-ggplot(Int_ufo, aes(x = Shape2)) + geom_bar()
+USA_ufo_summary2 <- merge(USA_ufo_summary2, trump_state, by = "State")
+USA_ufo_summary2 <- USA_ufo_summary2 %>% filter(State != 'DC')
+ggplot(USA_ufo_summary2, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)
+
 ```
 
 ```{r}
-ufo1950 <- ufo %>% filter(year>=1950)
+USA_ufo_summary3 <- USA_ufo %>% filter(year >= 2014 & State != "DC") %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary3 <- merge(USA_ufo_summary3, trump_state, by = "State")
+ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary3$State) + geom_smooth(method='lm',formula=y~x)
+```
+
+Unlike shape and duration, there is a clear change in the proportion of the shapes of observations since 1950. The obvious one is The proportion of circles clearly goes down and the proportion of light and triangles go up. 
+
+```{r}
+
 ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill")
 ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar()
 
 
 ```
 
+It appears in this graph that also the duration of sightings decreases with time. 
+
 ```{r}
+ufo1950 <- ufo1950 %>% filter(is.na(Bin_Dur) == FALSE)
 ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill")
 ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar()
 
@@ -206,13 +896,19 @@ ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar()
 
 ```
 
+We can see here that there was a large increase in both circle and light sightings in between 2010 and 2015, while rectangular and triangular have for the most part remained constant. 
+
 ```{r}
 
 shape_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2) %>% summarize(freq = n())
 ggplot(shape_overtime, aes(year, freq, color = Shape2)) + geom_line() +
     ggtitle("UFO Sighting Shapes Overtime") +
     labs (x = "Year", y = "Frequency")
+```
 
+It appears from this graph that longer duration sightings longer than 30 minutes has been relatively constant, while there has been a proliferation, particularly since 2010 of short duration observations. 
+
+```{r}
 dur_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur) %>% summarize(freq = n())
 ggplot(dur_overtime, aes(year, freq, color = Bin_Dur)) + geom_line() +
     ggtitle("UFO Sighting Durations Overtime") +
@@ -220,6 +916,8 @@ ggplot(dur_overtime, aes(year, freq, color = Bin_Dur)) + geom_line() +
 
 
 ```
+
+Moving back in time to 1950, a much large proportion of shapes were circles, but as time progressed circles became less proportional and moved towards the same range as the others.
 
 ```{r}
 
@@ -231,6 +929,7 @@ ggplot(shape_overtime, aes(year, Prop, color = Shape2)) + geom_line() +
     labs (x = "Year", y = "Proportion of Sightings")
 ```
 
+As one can see here the proportion of durations was incredibly variable before 1995, but after 1995 the proportion of durations of observations became less variable. 
 
 ```{r}
 temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
@@ -242,8 +941,10 @@ ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
 
 ```
 
+A summary of the above finding, the average duration over time can clearly be seen to be more variable prior to around 1995, where it became much more stable. There is also an overal decrease in sighting duration. 
+
 ```{r}
-truedur_overtime <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Duration) == FALSE & Duration <= 3600) %>% group_by(year) %>% summarize(AvgDur = mean(Duration) )
+truedur_overtime <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Duration) == FALSE & Duration <= 3600) %>% group_by(year) %>% summarize(AvgDur = mean(Duration) ) 
 
 ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
     ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Mean Duration (Seconds)")
