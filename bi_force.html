@@ -59,6 +59,19 @@ svg {
     color: white;
 }
 
+div.tooltip { 
+  position: absolute;     
+  text-align: center;     
+  width: 100px;          
+  height: 40px;         
+  padding: 2px;       
+  font: 12px sans-serif; 
+  background-color: #D0F0F0;    
+  border: 1px;    
+  border-radius: 8px;     
+  pointer-events: none;     
+  }
+
 </style>
 <script src="https://d3js.org/d3.v4.min.js"></script>
 </head>
@@ -103,7 +116,7 @@ function createlinkSet(links) {
   return result;
 }
 
-d3.json("force_250.json", function(error, graph) {
+d3.json("force.json", function(error, graph) {
   if (error) throw error;
 
   linkSet = createlinkSet(graph.links);
@@ -131,6 +144,10 @@ d3.json("force_250.json", function(error, graph) {
       .attr("stroke-opacity", 0.6)
       ;
 
+  var div = d3.select("body").append("div") 
+    .attr("class", "tooltip")       
+    .style("opacity", 0);
+
   var node = svg.selectAll(".node")
     .data(graph.nodes)
     .enter().append("g")
@@ -147,6 +164,19 @@ d3.json("force_250.json", function(error, graph) {
   node.append("circle")
       .attr("r", function(d) {return rScale(d.group)})
       .attr("fill", function(d) { return color(d.group); })
+      .on("mouseover", function(d) {    
+          div.transition()    
+              .duration(20)    
+              .style("opacity", 1);    
+          div.html("word: " + d.id + '\n' + "count: " +d.group*100000)  
+              .style("left", (d3.event.pageX) + "px")   
+              .style("top", (d3.event.pageY - 28) + "px");  
+          })          
+      .on("mouseout", function(d) {   
+          div.transition()    
+              .duration(500)    
+              .style("opacity", 0); 
+      });
 
 
   node.append("title")
