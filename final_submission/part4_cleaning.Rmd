@@ -550,6 +550,9 @@ bin_shape1 <- function(shape){
   else if(shape %in% c("fireball", "flare", "flash", "light")){
     return("Light")
   }
+  else if(shape %in% c(NA)) {
+    return(NA)
+  }
   return(shape)
 
 }
@@ -567,6 +570,9 @@ bin_shape2 <- function(shape){
   else if(shape %in% c("fireball", "flare", "flash", "light")){
     return("Light")
   }
+  else if(shape %in% c(NA)) {
+    return(NA)
+  }
   return("Other")
 
 }
@@ -583,6 +589,9 @@ bin_shape3 <- function(shape){
   }
   else if(shape %in% c("fireball", "flare", "flash", "light")){
     return("Light")
+  }
+  else if(shape %in% c(NA)) {
+    return(NA)
   }
   return(shape)
 
