@@ -41,7 +41,7 @@ Let's get cleaning! The dataset was scraped from the [National UFO Reporting Cen
 
 ```{r pull-in-data}
 # read in raw data
-ufo <- as_tibble(read_csv("data/ufo_data.csv", na=c('unknown', '', 'Unknown')))
+ufo <- as_tibble(read_csv("data/ufo_data_final.csv", na=c('unknown', '', 'Unknown')))
 #Bad Eggs
 ufo <- ufo[-c(3974, 74439),]
 print(head(ufo, n=5))
@@ -535,7 +535,7 @@ ufo$Hoax <- unlist(ufo$Hoax)
 
 ```
 
-Finally, since the `Shape` column had so many different kinds included, we consolidated them. We had different opinions on what bins would work well for analysis, so we included multiple versions.
+Since the `Shape` column had so many different kinds included, we consolidated them. We had different opinions on what bins would work well for analysis, so we included multiple versions.
 ```{r shape-binning}
 bin_shape1 <- function(shape){
   if(shape %in% c("hexagon", "rectangle", "diamond", "cross")){
@@ -601,14 +601,33 @@ table(ufo$Shape)
 
 ```
 
+We also got the description length to use for size of sighting report.
+```{r}
+#Add Description Length
+countWords <- function(entry){
+  numWords <- lengths(gregexpr("\\W+", entry)) + 1
+  return(numWords)
+}
+
+
+ufo <- ufo %>%
+  rowwise() %>%
+  mutate(
+    DescriptionLength = countWords(Desc),
+  )
+
+print(head(ufo, n=5))
+```
+
+
 Finally, we write the results to an new CSV and use that file in our analysis.
 ```{r save-to-data-folder}
 sapply(ufo, class)
-write.csv(ufo, file = "data/ufo_clean.csv")
+write.csv(ufo, file = "data/ufo_clean_final.csv")
 ```
 
 ```{r final-results}
-ufo_clean <- as_tibble(read_csv("data/ufo_clean.csv"))
+ufo_clean <- as_tibble(read_csv("data/ufo_clean_final.csv"))
 summary(ufo_clean)
 ```
 
