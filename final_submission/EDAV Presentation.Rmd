@@ -24,6 +24,7 @@ library(scales)
 library(micromapST)
 library(statebins)
 library(lubridate)
+library(scales)
 ```
 
 ```{r add-data, warning=FALSE}
@@ -204,14 +205,22 @@ ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
 ```
 
 ```{r}
-ggplot(ufo, aes(Time)) +
-  geom_histogram(bins=48) 
+ggplot(ufo, aes(as.POSIXct(Time))) +
+  geom_histogram(bins=48) +
+  ggtitle("UFO Sighting Frequency Over Time") +
+  labs(y = "Frequency") +
+  # scale_x_datetime(breaks = date_breaks("1 hour"))
+  scale_x_datetime(breaks = date_breaks("2 hour"), labels = date_format("%H:%M"))
+
 ```
 
 
 ```{r}
 ggplot(ufo, aes(month, fill = month)) +
-  geom_bar(bins=12) + scale_fill_viridis(discrete = TRUE)
+  geom_bar(bins=12) + 
+  scale_fill_viridis(discrete = TRUE) +
+  ggtitle("UFO Sighting Frequency By Month") +
+  labs(y = "Frequency", x = "Month")
 ```
 
 ```{r}
@@ -219,17 +228,26 @@ ggplot(ufo, aes(month, fill = month)) +
 ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
 
 ggplot(ufoShortDescription, aes(DescriptionLength)) +
-  geom_histogram(bins=50)
+  geom_histogram(bins=70) +
+  ggtitle("UFO Sighting Frequency By Comment Word Count") +
+  labs(y = "Frequency", x = "Word Count")
+
 ```
 
 ```{r}
 ggplot(ufoShortDescription, aes(x=Time, y=DescriptionLength)) +
-  geom_point(alpha=0.05)
+  geom_point(alpha=0.05, aes(color = Shape2)) +
+  ggtitle("UFO Sighting Time By Comment Word Count") +
+  labs(y = "Word Count", x = "Time") + 
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
 ```
 
 ```{r}
 ufoFilteredDateDescription <- filter(ufoShortDescription, as.numeric(year) > 1960)
 
 ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
-  geom_point(alpha=0.05)
-```
+  geom_point(alpha=0.05, aes(color = Shape2)) +
+  ggtitle("UFO Sighting Date By Comment Word Count") +
+  labs(y = "Word Count", x = "Date") + 
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+``` 
