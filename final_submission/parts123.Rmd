@@ -21,13 +21,13 @@ Our data was scraped off of the National UFO Reporting Center’s (NUFORC) websi
 
 The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
 
-Data Scraping
+#### Data Scraping
 We developed a python script to scrape the data from http://www.nuforc.org/webreports/. There is one index page for each month that contains links to detailed description of each UFO sighting. Using a html parsing package named BeautifulSoup, the script goes through each of these links to extract the data fields including date/time of observation, shape, city, state, duration, and full description. The source code can be found ____________.
 
-Two-word affinity
+#### Two-word affinity
 We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be found ___________.
 
-External Dataset
+#### External Dataset
 To better explore our theories behind UFO sighting locations, we used several external datasets. Our data for how many hours a day people at the state level spend on Sports, Exercise, and Recreation and the percentage of people in a state that engaged in sports or exercise in a given day came from the American Time Use Survey. The ATUS is conducted by the Bureau of Labor Statistics. The data in the survey we used was collected from 2009-2015 via phone interviews in which interviewees were asked to recount the activities of their day. http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html
 https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm
 
@@ -38,3 +38,159 @@ The results by state of the 2016 election were accessed from https://www.politic
 
 # 3 Analysis of Data Quality
 *Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
+
+In this section we look at the data in its raw form and see what we will need to do in order to fix it for analysis. All of the cleaning of the data is done in `part4_cleaning.Rmd`. Here we are just assessing the ingredients before we go and bake up some tasty graphs and tables.
+
+Because we scraped the data off of a website, it started out in a rather raw form. Using a python script with Beautiful Soup, we were able to collect all of the UFO Sightings listed on the NUFORC site.
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+
+library(DAAG)
+
+library(vcd)
+
+library(ggplot2)
+library(extracat)
+library(scales)
+library(micromapST)
+library(statebins)
+library(lubridate)
+library(maps)
+```
+
+```{r pull-in-data}
+# read in raw data
+ufo_raw <- as_tibble(read_csv("data/ufo_data.csv"))
+
+print(head(ufo_raw, 5))
+```
+
+Looking at the data, there is a lot of inconstancy that needs to be corrected. This stems from the fact that the way these sightings are reported are with a form that does not limit the entries to consistent fields. Looking at the NUFORC submission form (http://www.ufocenter.com/reportformsubmit.html), there are suggestions for how you should format the report, but they are not required. For example, where it asks for "Number of Witnesses" I could type in "foo" and it would be fine. This is evident in the results we see in the raw data.
+
+## The Basics
+
+First off, the dataset has `r nrow(ufo_raw)` reported sightings spanning quite a large date range. Maybe a little too large to be honest. 
+
+```{r basic-histogram-and-row-count}
+print(nrow(ufo_raw))
+
+ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40) + ggtitle("The Skewing by Old-Timey Sightings")
+
+```
+
+The above graph looks so left skewed because of a few sightings that are reported to have occurred anywhere between 1400 and 1800. These sightings may need to be ignored in order to better understand the behavior of the dataset without skewing the results. Although these sightings are a consideration, they are a relatively small percentage of the total dataset.
+
+```{r perc-before-1800}
+ufo_raw %>%
+  filter(year < 1800) %>%
+  summarise(before1800 = n())
+
+ufo_raw %>%
+  filter(year < 1900) %>%
+  summarise(before1900 = n())
+```
+
+In fact, the vast majority of sightings occur after the founding the the NUFORC in 1974 (http://www.nuforc.org/General.html), which is a good sign for data quality.
+
+```{r before-1974}
+ufo_raw %>%
+  filter(year < 1974) %>%
+  summarise(beforeFoundingOfNUFORC = n(), perc_beforeFoundingOfNUFORC = n() / nrow(ufo_raw))
+```
+
+Another good sign is that the most sightings have no NA values.
+```{r na-values}
+visna(ufo_raw, sort = "b")
+```
+
+From here we will look at a few of the columns that need attention.
+
+## States
+
+Let's look at the number of states we have in the dataset.
+```{r state-count}
+nrow(table(ufo_raw$State))
+```
+
+Huh. That's more than I remember learning there were back in grade school. Let's take a look:
+```{r state-view}
+table(ufo_raw$State)
+```
+
+Turns out the dataset is not distinguishing between US States and territories like YT and YK in Canada (both version of Yukon (https://en.wikipedia.org/wiki/Canadian_postal_abbreviations_for_provinces_and_territories)). While this is fine on a sighting-by-sighting basis, plotting state graphs later on with 70 results will raise some eyebrows, so this will need to be addressed. Also, the eagle-eyed viewer will notice Florida and California have a handful of Camel-Case results (Fl and Ca) that will need to be dealt with as well.
+
+## Shape
+
+Shapes must be standardized right? How many shapes in the sky could there be?
+```{r shape-view}
+table(ufo_raw$Shape)
+
+```
+
+I guess a lot. Here we see a lot of categories that can be merged just by converting all of the types to lowercase ("changing" and "Changing") or by combining different tenses ("changed" and "changing") or a little of both ("triangle", "Triangle", and "TRIANGULAR"). 
+
+We also see `r table(ufo_raw$Shape)['Unknown']` values that are "Unknown" (plus the one "unknown" that will combine). While "Unknown" is a good dropdown category for a shape, `NA` makes more sense in data analysis. 
+
+In the cleaning file, we choose to split the shape column in different ways since we each had different ideas about the best way to merge different shapes (combine chevron and pyramid or leave them apart).
+
+## Duration
+
+This is the big one. In order to use the duration, we want it to be a number, but it is currently a string, with a ton of variety.
+```{r duration-type}
+class(ufo_raw$Duration)
+```
+
+Again, this is due to the freeform textbox in the form used to report sightings online. In fact, because of this ability to write whatever you want in the `duration` field, there are `r length(unique(ufo_raw$Duration))` different inputs for this dataset.
+
+```{r duration-length}
+length(unique(ufo_raw$Duration))
+```
+
+This includes some gems, which are everything from simple misspellings to the completely bizarre.
+
+```{r gems-duration}
+print(c(ufo_raw$Duration[23], ufo_raw$Duration[37], ufo_raw$Duration[58], ufo_raw$Duration[86], ufo_raw$Duration[280], ufo_raw$Duration[318], ufo_raw$Duration[111828],ufo_raw$Duration[1213], ufo_raw$Duration[17679], ufo_raw$Duration[65718], ufo_raw$Duration[42052], ufo_raw$Duration[31738] ))
+
+
+```
+
+Here are some examples of the more wordy entries
+```{r bunch-of-string-versions}
+foo <- tolower(sort(ufo_raw$Duration))
+unique(foo[100734:100934])
+# foo[1:3]
+```
+
+However, the majority follow a common structure which can be exploited. Most entries are a number, a space, and a time frame. For example, "45 seconds" or "5 minutes"
+```{r common-formatting}
+print(ufo_raw$Duration[2:8])
+```
+
+This was by far the messiest column to deal with. In order to convert the dataset, we write a set of functions to handle all of the corner cases and convert them into numbers on a common scale (in cleaning file).
+
+## Conclusion
+
+The big takeaway from the raw data is that if you ever want to use the data you collect from people, standardize how you store it. For example, don't allow users to input whatever they want or simply suggest the format. Instead, force users to type numbers or choose a dropdown item. Don't underestimate the ability for a user to write something crazy in the input box; just stop them in their tracks.
+
+Big points:
+- Freeform submission is NOT a good idea
+- Standardization will make your data scientists happy later on
+- Don't combine fields into one column (`State` should probably be stored as international and domestic)
+- Don't be afraid to store an unknown value as `NA`
+
+
+At this point, take a look at the `part4_cleaning` file to see how we standardized the data to make the EDA possible.
+
+
+
+
+
+
+
+
