@@ -1,0 +1,253 @@
+---
+title: "EDAV Presentation"
+author: "Robert Davis DeRodes, Josh Feldman"
+date: "4/21/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+library(viridis)
+library(DAAG)
+
+library(vcd)
+library(ggthemes)
+library(ggplot2)
+library(extracat)
+library(scales)
+library(micromapST)
+library(statebins)
+library(lubridate)
+library(scales)
+```
+
+```{r add-data, warning=FALSE}
+
+ufo <- as_tibble(read_csv("data/ufo_clean.csv"))
+ufo <- ufo %>% select(-X1, -X1_1)
+
+state_pops <- as_tibble(read_csv("data/StatePops.csv"))
+excer <- as_tibble(read.csv("data/Excercise.csv"))
+colnames(excer)[2] <- "Excercise"
+
+trump_state <- as_tibble(read_csv("data/TrumpState.csv"))
+
+obese <- as_tibble(read_csv("data/Obesity.csv"))
+
+ufo <- ufo %>%
+  mutate(Shape2 = fct_relevel(Shape2, "Circle", "Light", "Triangle", "Rectangle", "Other"))
+USA_ufo <- ufo %>% filter(In_USA == TRUE & is.na(Shape2) == FALSE)
+
+```
+
+```{r duration-binning-custom}
+bin_duration <- function(duration){
+  
+  if(is.na(duration) == TRUE){
+    return(NA)
+  }
+  
+  if(duration < 60){
+    return("< 1")
+  }
+  else if(duration < 300){
+    return("1 - 5")
+    
+  }
+  else if(duration < 600){
+    
+    return("5 - 10")
+  }
+  
+  else if(duration < 1800){
+    return("10 - 30")
+  }
+  
+  else if (duration < 3600){
+    return("30 - 60")
+  }
+  else{
+    return("60+")
+  }
+  return(NA)
+  
+}
+
+```
+
+#### Unidentified Flying Graphs
+
+```{r format-data-for-plotting}
+ufo <- ufo %>% filter(Hoax == FALSE)
+ufo <- ufo %>% mutate(`Bin_Dur` = lapply(ufo$Duration, bin_duration))
+
+ufo$Bin_Dur <- unlist(ufo$Bin_Dur)
+ufo <- ufo %>%
+  mutate(Bin_Dur = fct_relevel(Bin_Dur, "< 1", "1 - 5", "5 - 10", "10 - 30", "30 - 60", "60+"))
+durshape <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(Bin_Dur, Shape2) %>% summarize(durshapefreq = n())
+temp <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(Bin_Dur) %>% summarize(durfreq = n())
+durshape <- merge(durshape, temp, by="Bin_Dur")
+durshape$prop <- durshape$durshapefreq/durshape$durfreq
+
+```
+
+```{r sighting-freq}
+ufo1950 <- ufo %>% filter(year>=1950)
+ggplot(ufo1950, aes(x = year)) + geom_bar() +
+  ggtitle("Sighting Frequency (1950-2018)") + ylab("Number of Sightings")
+```
+
+```{r shape-bar-graph}
+ggplot(ufo, aes(x = Shape2)) + geom_bar() +
+  ggtitle("Sighting Frequency by Observed Shape") +
+  xlab("Shape") + ylab("Number of Sightings")
+```
+
+```{r duration-bar-graph}
+ggplot(ufo, aes(x = Bin_Dur)) + geom_bar() + labs(x = "Duration in Minutes", y = "Number of Sightings") +
+  ggtitle("Sighting Frequency by Duration")
+```
+
+```{r shape-prop-facet}
+cbPalette <- c("#56B4E9", "#F0E442", "#E69F00", "#009E73", "#CC79A7", "#0072B2", "#999999",  "#D55E00")
+ggplot(durshape, aes(x = Bin_Dur, y = prop, fill = Shape2)) +
+  geom_bar(stat = "identity") + facet_wrap(~Shape2) +
+  ggtitle("Shape Proportion Across Durations") +
+  xlab("Duration") + scale_fill_manual(values=cbPalette, name = "Shape") + ylab("Proportion of Sightings of Duration Type")
+
+```
+
+```{r shape-by-state}
+ggplot(USA_ufo, aes(x = State, fill = Shape2)) + geom_bar(position = "fill") +
+  ggtitle("Shapes by State are Constant") + ylab("Proportion of Sightings in State") +  scale_fill_manual(values=cbPalette, name = "Shape")
+```
+
+```{r state-map-sightings}
+USA_ufo <- merge(USA_ufo, state_pops, by = "State")
+shape_prop<- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+shape_prop$state <- shape_prop$State
+statebins(shape_prop, value_col = "Prop", text_color =  "black", font_size = 3, legend_title = "Sightings Per 10,000 Residents", legend_position =  "bottom") + labs(title = "The Pacific Northwest is More Extraterrestrial")
+
+```
+
+```{r}
+USA_ufo_summary2 <- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary2 <- merge(USA_ufo_summary2, excer, by = "State")
+ggplot(USA_ufo_summary2, aes(x = ATUS, y = Prop)) + geom_point(stat = "identity") + labs(x = "Hours a day spent doing Sports, Excercise, Recreation", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State)+ geom_smooth(method='lm',formula=y~x) + ggtitle("More Time Excercising, More Sightings")
+```
+
+```{r}
+ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x)+ ggtitle("More People Excercising, More Sightings")
+```
+
+```{r}
+USA_ufo_summary2 <- merge(USA_ufo_summary2, obese, by = "State")
+ggplot(USA_ufo_summary2, aes(x = Obesity, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Obese Adults", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x) + ggtitle("You Can't See a UFO if You Stay Inside")
+
+```
+
+```{r}
+USA_ufo_summary3 <- USA_ufo %>% filter(year >= 2010 & State != "DC") %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary3 <- merge(USA_ufo_summary3, trump_state, by = "State")
+ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text(label=USA_ufo_summary3$State) + geom_smooth(method='lm',formula=y~x) + ggtitle("They Come for Brains")
+```
+
+```{r}
+
+shape_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2) %>% summarize(freq = n())
+ggplot(shape_overtime, aes(year, freq, color = Shape2)) + geom_line() +
+    ggtitle("UFO Sighting Shapes Overtime") +
+    labs (x = "Year", y = "Frequency") +  scale_color_manual(values=cbPalette, name = "Shape")
+```
+
+```{r}
+dur_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur) %>% summarize(freq = n())
+ggplot(dur_overtime, aes(year, freq, color = Bin_Dur)) + geom_line() +
+    ggtitle("UFO Sighting Durations Over Time") +
+    labs (x = "Year", y = "Frequency") + scale_color_manual(values=cbPalette, name = "Sighting Duration")
+
+
+```
+
+```{r}
+
+temp2 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
+temp2 <- merge(ufo, temp2, by = "year")
+shape_overtime <- temp2 %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
+ggplot(shape_overtime, aes(year, Prop, color = Shape2)) + geom_line() +
+    ggtitle("Saucers Become Out of Style") +
+    labs (x = "Year", y = "Proportion of Sightings") +  scale_color_manual(values=cbPalette, name = "Shape")
+```
+
+```{r}
+temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
+temp3 <- merge(ufo, temp3, by = "year")
+dur_overtime <- temp3 %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
+ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") +  scale_color_manual(values=cbPalette)
+
+
+```
+
+```{r}
+truedur_overtime <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Duration) == FALSE & Duration <= 3600) %>% group_by(year) %>% summarize(AvgDur = mean(Duration) ) 
+
+ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Mean Duration (Seconds)")
+
+
+```
+
+```{r}
+ggplot(ufo, aes(as.POSIXct(Time))) +
+  geom_histogram(bins=48) +
+  ggtitle("UFO Sighting Frequency Over Time") +
+  labs(y = "Frequency") +
+  # scale_x_datetime(breaks = date_breaks("1 hour"))
+  scale_x_datetime(breaks = date_breaks("2 hour"), labels = date_format("%H:%M"))
+
+```
+
+
+```{r}
+ggplot(ufo, aes(month, fill = month)) +
+  geom_bar(bins=12) + 
+  scale_fill_viridis(discrete = TRUE) +
+  ggtitle("UFO Sighting Frequency By Month") +
+  labs(y = "Frequency", x = "Month")
+```
+
+```{r}
+
+ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
+
+ggplot(ufoShortDescription, aes(DescriptionLength)) +
+  geom_histogram(bins=70) +
+  ggtitle("UFO Sighting Frequency By Comment Word Count") +
+  labs(y = "Frequency", x = "Word Count")
+
+```
+
+```{r}
+ggplot(ufoShortDescription, aes(x=Time, y=DescriptionLength)) +
+  geom_point(alpha=0.05, aes(color = Shape2)) +
+  ggtitle("UFO Sighting Time By Comment Word Count") +
+  labs(y = "Word Count", x = "Time") + 
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+```
+
+```{r}
+ufoFilteredDateDescription <- filter(ufoShortDescription, as.numeric(year) > 1960)
+
+ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
+  geom_point(alpha=0.05, aes(color = Shape2)) +
+  ggtitle("UFO Sighting Date By Comment Word Count") +
+  labs(y = "Word Count", x = "Date") + 
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+``` 

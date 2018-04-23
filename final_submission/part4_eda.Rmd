@@ -372,4 +372,37 @@ ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
 
 ```
 
+```{r}
+ggplot(ufoClean, aes(Time)) +
+  geom_histogram(bins=48)
+```
+
+```{r}
+ggplot(ufoClean, aes(month)) +
+  geom_bar(bins=12)
+```
+
+```{r}
+ufoShortDescription <- filter(ufoShortDescription, DescriptionLength < 1000)
+
+ggplot(ufoShortDescription, aes(DescriptionLength)) +
+  geom_histogram(bins=50)
+```
+
+```{r}
+ggplot(ufoShortDescription, aes(x=Time, y=DescriptionLength)) +
+  geom_point(alpha=0.05)
+```
+
+```{r}
+ufoFilteredDateDescription <- filter(ufoShortDescription, as.numeric(year) > 1960)
+
+ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
+  geom_point(alpha=0.05)
+```
+
+
+
+
+
 #### Comments
