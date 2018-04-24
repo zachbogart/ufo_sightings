@@ -198,7 +198,7 @@ ufoFilteredDateDescription <- filter(ufoShortDescription, as.numeric(year) > 196
 ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
   geom_point(alpha=0.03, aes(color = Shape2)) +
   ggtitle("UFO Sighting Date By Comment Word Count") +
-  labs(y = "Word Count", x = "Date") + 
+  labs(y = "Word Count", x = "Year") + 
   guides(colour = guide_legend(override.aes = list(alpha = 1)))+ scale_color_manual(values=cbPalette, name = "Shape")
 ``` 
 
@@ -209,7 +209,7 @@ ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
 ggplot(durshape, aes(x = Bin_Dur, y = prop, fill = Shape2)) +
   geom_bar(stat = "identity") + facet_wrap(~Shape2) +
   ggtitle("Shape Proportion Across Durations") +
-  xlab("Duration") + scale_fill_manual(values=cbPalette, name = "Shape") + ylab("Proportion of Sightings of Duration Type")
+  xlab("Duration in Minutes") + scale_fill_manual(values=cbPalette, name = "Shape") + ylab("Proportion of Sightings of Duration Type")+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -276,7 +276,7 @@ ggplot(shape_overtime, aes(year, freq, color = Shape2)) + geom_line() +
 dur_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur) %>% summarize(freq = n())
 ggplot(dur_overtime, aes(year, freq, color = Bin_Dur)) + geom_line() +
     ggtitle("UFO Sighting Durations Over Time") +
-    labs (x = "Year", y = "Frequency") + scale_color_manual(values=cbPalette, name = "Sighting Duration")
+    labs (x = "Year", y = "Frequency") + scale_color_manual(values=cbPalette, name = "Sighting Duration in Minutes")
 
 
 ```
@@ -300,7 +300,8 @@ temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %
 temp3 <- merge(ufo, temp3, by = "year")
 dur_overtime <- temp3 %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
 ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
-    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") +  scale_color_manual(values=cbPalette)
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") +  scale_color_manual(values=cbPalette, name = "Sighting Duration in Minutes")
+                                                    
 
 
 ```
@@ -308,10 +309,10 @@ ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
 ##
 
 ```{r, echo = FALSE}
-truedur_overtime <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Duration) == FALSE & Duration <= 3600) %>% group_by(year) %>% summarize(AvgDur = mean(Duration) ) 
+truedur_overtime <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Duration) == FALSE & Duration <= 3600) %>% group_by(year) %>% summarize(AvgDur = mean(Duration)/60 ) 
 
 ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
-    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Mean Duration (Seconds)")
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Mean Duration (Minutes)")
 
 
 ```
