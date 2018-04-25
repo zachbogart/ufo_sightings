@@ -18,11 +18,10 @@ knitr::opts_chunk$set(warning = FALSE,
 
 library(Sleuth3)
 library(tidyverse)
-
 library(DAAG)
-
+library(ggthemes)
 library(vcd)
-
+library(viridis)
 library(ggplot2)
 library(extracat)
 library(scales)
@@ -43,6 +42,8 @@ colnames(excer)[2] <- "Excercise"
 trump_state <- as_tibble(read_csv("data/TrumpState.csv"))
 
 obese <- as_tibble(read_csv("data/Obesity.csv"))
+
+cbPalette <- c("#56B4E9", "#F0E442", "#E69F00", "#009E73", "#CC79A7", "#0072B2", "#D55E00", "#999999")
 
 ufo <- ufo %>%
   mutate(Shape2 = fct_relevel(Shape2, "Circle", "Light", "Triangle", "Rectangle", "Other"))
@@ -163,10 +164,68 @@ ggplot(ufo, aes(x = Bin_Dur)) + geom_bar() + labs(x = "Duration in Minutes", y =
 And the majority of sightings don't take long, occuring for less than an hour.
 ```{r hour-limit-histogram}
 ufodurclip <- ufo %>% filter(is.na(Duration) == FALSE & Duration <= 3600)
-ggplot(ufodurclip, aes(x = Duration)) + geom_histogram() +
+ggplot(ufodurclip, aes(x = Duration)) + geom_histogram(, color="black", fill="green") +
   ggtitle("Duration Histogram, Limited to 1 Hour")
 ```
 
+As expected, the majority of UFO sighting happen between 6pm and midnight. Late enough that it's dark, but early enough that people haven't gone to sleep yet.
+```{r freq_over_time, echo = FALSE}
+ggplot(ufo, aes(as.POSIXct(Time))) +
+  geom_histogram(bins=48, color="black", fill="green") +
+  ggtitle("UFO Sighting Frequency Over Time") +
+  labs(y = "Frequency") +
+  # scale_x_datetime(breaks = date_breaks("1 hour"))
+  scale_x_datetime(breaks = date_breaks("2 hour"), labels = date_format("%H:%M")) + 
+  xlab("Time of Day") + 
+  scale_fill_viridis(name = "Frequency")
+
+```
+
+More sightings seeem to happen during months with warmer temperatures.People tend to spend more time outside during warmer months.. coincidence? 
+```{r freq_by_month, echo=FALSE}
+ufoAmerica <- ufo %>% filter(is.na(In_USA) == FALSE && In_USA == TRUE)
+ggplot(ufo, aes(month)) +
+  geom_bar(bins=12, color="black", fill="green") + 
+  scale_fill_viridis(discrete = TRUE, name = "Month", labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December")) +
+  ggtitle("UFO Sighting Frequency By Month") +
+  labs(y = "Number of Observations", x = "Month")+ scale_x_discrete(
+        labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December"))
+```
+
+Average word count of each comment centers around 100 words, but is it correlated other features?
+```{r freq_by_word_count, echo = FALSE}
+
+ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
+
+ggplot(ufoShortDescription, aes(DescriptionLength)) +
+  geom_histogram(bins=70, color="black", fill="green") +
+  ggtitle("UFO Sighting Frequency By Comment Word Count") +
+  labs(y = "Frequency", x = "Word Count") + scale_fill_viridis(name = "Frequency")
+
+```
+
+The word count doesn't seem to be affected by Time or Shape, but the Shape sure does change over time. Durig the day we don't see any examples of `light`, while at night we see a mix of everything. We can also see clear rounding happening at every hour.
+```{r time_by_word_count, echo = FALSE}
+ggplot(ufoShortDescription, aes(x=as.POSIXct(Time), y=DescriptionLength)) +
+  geom_point(alpha=0.03, aes(color = Shape2)) +
+  ggtitle("UFO Sighting Time By Comment Word Count") +
+  labs(y = "Word Count", x = "Time")  +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) + 
+  scale_color_manual(values=cbPalette, name = "Shape") + 
+  scale_x_datetime(breaks = date_breaks("2 hour"), labels = date_format("%H:%M"))
+```
+
+Again, word count doesn't seem to be correlated with other features. This graph serves to show that when the website form went up in 1998 there was a huge spike in data.
+```{r date_by_word_count, echo = FALSE}
+ufoFilteredDateDescription <- filter(ufoShortDescription, as.numeric(year) > 1960)
+
+ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
+  geom_point(alpha=0.03, aes(color = Shape2)) +
+  ggtitle("UFO Sighting Date By Comment Word Count") +
+  labs(y = "Word Count", x = "Year") + 
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) + 
+  scale_color_manual(values=cbPalette, name = "Shape")
+``` 
 
 We're going to need to control for population, as most of the most popular states (California) have large numbers of sightings due to it's size. 
 
@@ -370,35 +429,6 @@ ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
     ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Mean Duration (Seconds)")
 
 
-```
-
-```{r}
-ggplot(ufoClean, aes(Time)) +
-  geom_histogram(bins=48)
-```
-
-```{r}
-ggplot(ufoClean, aes(month)) +
-  geom_bar(bins=12)
-```
-
-```{r}
-ufoShortDescription <- filter(ufoShortDescription, DescriptionLength < 1000)
-
-ggplot(ufoShortDescription, aes(DescriptionLength)) +
-  geom_histogram(bins=50)
-```
-
-```{r}
-ggplot(ufoShortDescription, aes(x=Time, y=DescriptionLength)) +
-  geom_point(alpha=0.05)
-```
-
-```{r}
-ufoFilteredDateDescription <- filter(ufoShortDescription, as.numeric(year) > 1960)
-
-ggplot(ufoFilteredDateDescription, aes(x=Date, y=DescriptionLength)) +
-  geom_point(alpha=0.05)
 ```
 
 
