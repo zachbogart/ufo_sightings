@@ -1,0 +1,21 @@
+---
+title: "EDAV Project: UFO Sightings"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+date: "4/5/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 6 Interactive Component
+*Clarity of presentation, including instructions*
+*Technical execution (include a description of what you would work on in the future, what you've attempted, etc. so we know it's on your radar)*
+
+https://bl.ocks.org/JoshFeldman777/raw/05cb22a83c98f76ce612d039ef15155d/a01790096be75c4c2f6616fb92e61fb9061dd193/
+
+
+# 7 Conclusion
+*Discuss limitations and future directions, lessons learned.*
+
