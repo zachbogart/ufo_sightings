@@ -13,7 +13,21 @@ knitr::opts_chunk$set(echo = TRUE)
 *Clarity of presentation, including instructions*
 *Technical execution (include a description of what you would work on in the future, what you've attempted, etc. so we know it's on your radar)*
 
-https://bl.ocks.org/JoshFeldman777/raw/05cb22a83c98f76ce612d039ef15155d/a01790096be75c4c2f6616fb92e61fb9061dd193/
+Instructions are included on the site, copied here:
+
+Each circle represents a common word in descriptions of alien cities. The size of the circle corresponds to the frequency of the word. Each link between 2 words represents the frequency with which those two words were in the same comment.
+Click a word to see some of the descriptions it belongs to!
+
+https://bl.ocks.org/JoshFeldman777/raw/d24a1f44cc18527815701ecf997cf538/488f28e319c4ed33839e634bd3fba512ab3df602/
+
+We feel it's neccesary to acknowledge the use of circles in our visualization. The trouble with radius scaled circles is that users have trouble discerning the difference in value between circles of different sizes. We decided to use circles despite this flaw because the point of the visualization was not to see the minute differences in sizes between circles, but rather the connections between words. If the user wants to see the exact frequency of a word they can click on the word and view the count. Using the size of the circles simply gives the user a glimpse at relative frequency of all the circles. 
+
+Given more time, we would add much more customization to this visualization. Our main bottleneck was a need to precompute the unigram and bigram frequencies, as creating them on the fly would drastically slow down the visualization. We considered adding each of the following items:
+
+* Slider to filter the number of words included in the graph
+* Search bar to filter for only certain words
+* Allow custom grouping of words to combine circles and with them links to other words
+* Search through all actual comments (we only used a random sample of comments here)
 
 
 # 7 Conclusion
