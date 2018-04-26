@@ -19,7 +19,7 @@ Notes:
 
 Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. The NUFORC is headquartered in Davenport, WA (East Washington). 
 
-The event’s summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
+The events summary page has events that go back as far as 1561 (where the artist Hans Glaser depicted his UFO sighting in wood) until March 2018. The reports come from a variety of countries, but the large majority of them are from the United States. Each month's summary page has summaries of all of their reported sightings including the Date/Time, City, State (if applicable), Shape of the UFO, Duration, text summary of the event, and the date it was posted on the website.  In several of the sightings’ summaries there are indications on whether or not the in-taker thought the sighting was a hoax or not. 
 
 #### Data Scraping
 We developed a python script to scrape the data from http://www.nuforc.org/webreports/. There is one index page for each month that contains links to detailed description of each UFO sighting. Using a html parsing package named BeautifulSoup, the script goes through each of these links to extract the data fields including date/time of observation, shape, city, state, duration, and full description. The source code can be found ____________.
@@ -71,100 +71,61 @@ ufo_raw <- as_tibble(read_csv("data/ufo_data.csv"))
 print(head(ufo_raw, 5))
 ```
 
-Looking at the data, there is a lot of inconstancy that needs to be corrected. This stems from the fact that the way these sightings are reported are with a form that does not limit the entries to consistent fields. Looking at the NUFORC submission form (http://www.ufocenter.com/reportformsubmit.html), there are suggestions for how you should format the report, but they are not required. For example, where it asks for "Number of Witnesses" I could type in "foo" and it would be fine. This is evident in the results we see in the raw data.
+Looking at the data, there is a lot of inconsistency that needs to be corrected. This stems from the fact that sightings are reported using an online form that does not enforce data type in collection. Looking at the NUFORC submission form (http://www.ufocenter.com/reportformsubmit.html), there are suggestions for how you should format the report, but they are not required nor enforced. For example, where it asks for "Number of Witnesses" I could type in "foo" and the site will accept the submission. This is evident in the results we see in the raw data.
 
 ## The Basics
 
-First off, the dataset has `r nrow(ufo_raw)` reported sightings spanning quite a large date range. Maybe a little too large to be honest. 
+First off, the dataset has `r nrow(ufo_raw)` reported sightings spanning centuries. 
 
 ```{r basic-histogram-and-row-count}
-print(nrow(ufo_raw))
-
-ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40) + ggtitle("The Skewing by Old-Timey Sightings")
+# print(nrow(ufo_raw))
+library(scales)
+ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40, fill='dodgerblue') + ggtitle("The Skewing by Old-Timey Sightings") + scale_y_continuous(name='count (thousands)', labels = c(20,40,60,80),breaks = c(20000,40000,60000,80000)) + geom_vline(xintercept = 1974, color="red") + theme_light()
 
 ```
 
-The above graph looks so left skewed because of a few sightings that are reported to have occurred anywhere between 1400 and 1800. These sightings may need to be ignored in order to better understand the behavior of the dataset without skewing the results. Although these sightings are a consideration, they are a relatively small percentage of the total dataset.
+The above graph looks so left skewed because of a few sightings that are reported to have occurred anywhere between 1400 and 1800. These sightings may need to be ignored in order to better understand the behavior of the dataset without skewing the results. There are just `r count(filter(ufo_raw, year<1900))`. Although these sightings are a consideration, they are a relatively small percentage of the total dataset. In fact, the vast majority of sightings occur after the founding the the NUFORC in 1974 (http://www.nuforc.org/General.html), which is a good sign for data quality.
 
-```{r perc-before-1800}
-ufo_raw %>%
-  filter(year < 1800) %>%
-  summarise(before1800 = n())
-
-ufo_raw %>%
-  filter(year < 1900) %>%
-  summarise(before1900 = n())
-```
-
-In fact, the vast majority of sightings occur after the founding the the NUFORC in 1974 (http://www.nuforc.org/General.html), which is a good sign for data quality.
-
-```{r before-1974}
-ufo_raw %>%
-  filter(year < 1974) %>%
-  summarise(beforeFoundingOfNUFORC = n(), perc_beforeFoundingOfNUFORC = n() / nrow(ufo_raw))
-```
-
-Another good sign is that the most sightings have no NA values.
+Another good sign is that the most sightings have no NA values. Further, of the reports that are missing some information, they tend to miss only one field, with the State being the most frequent missing feature.
 ```{r na-values}
 visna(ufo_raw, sort = "b")
 ```
 
-From here we will look at a few of the columns that need attention.
+We will now explore the individual feature quality and cleaning.
 
 ## States
 
 Let's look at the number of states we have in the dataset.
 ```{r state-count}
 nrow(table(ufo_raw$State))
+
+sort(unique(ufo_raw$State))
 ```
 
-Huh. That's more than I remember learning there were back in grade school. Let's take a look:
-```{r state-view}
-table(ufo_raw$State)
-```
-
-Turns out the dataset is not distinguishing between US States and territories like YT and YK in Canada (both version of Yukon (https://en.wikipedia.org/wiki/Canadian_postal_abbreviations_for_provinces_and_territories)). While this is fine on a sighting-by-sighting basis, plotting state graphs later on with 70 results will raise some eyebrows, so this will need to be addressed. Also, the eagle-eyed viewer will notice Florida and California have a handful of Camel-Case results (Fl and Ca) that will need to be dealt with as well.
+Due to the data entry issues discussed earlier, and that reports were not limited to the United States, there are 70 unique state abbreviations. Listing out the state abbreviations in alphabetical order, we can see that some of these can easily be identified as Canadian territories (i.e. 'YK' and 'BC'). Some territories may also have multiple valid abbreviations. For example, 'YT' and 'YK' are both abbreviations for Yukon Territory (https://en.wikipedia.org/wiki/Canadian_postal_abbreviations_for_provinces_and_territories). Also, the eagle-eyed viewer will notice Florida and California have a handful of Camel-Case results (Fl and Ca) that will need to be dealt with as well. When doing geographic based analysis, we have to standardize these to the known geographies.
 
 ## Shape
 
-Shapes must be standardized right? How many shapes in the sky could there be?
+The raw dataset reports 46 unique shapes. Listing these out, we can see that many shapes are similar in description.
 ```{r shape-view}
-table(ufo_raw$Shape)
-
+sort(unique(ufo_raw$Shape))
 ```
 
-I guess a lot. Here we see a lot of categories that can be merged just by converting all of the types to lowercase ("changing" and "Changing") or by combining different tenses ("changed" and "changing") or a little of both ("triangle", "Triangle", and "TRIANGULAR"). 
+Here we see a lot of categories that can be merged just by converting all of the types to lowercase ("changing" and "Changing") or by combining different tenses ("changed" and "changing") or a combination of both ("triangle", "Triangle", and "TRIANGULAR"). 
 
-We also see `r table(ufo_raw$Shape)['Unknown']` values that are "Unknown" (plus the one "unknown" that will combine). While "Unknown" is a good dropdown category for a shape, `NA` makes more sense in data analysis. 
+We also see `r table(ufo_raw$Shape)['Unknown']` values that are "Unknown". While "Unknown" is a good dropdown category for a shape, `NA` makes more sense in our data analysis, since we will only consider the definitive shapes that were observed.
 
-In the cleaning file, we choose to split the shape column in different ways since we each had different ideas about the best way to merge different shapes (combine chevron and pyramid or leave them apart).
+We still want to reduce the number of unique shapes to help find trends. We decide to bin the shapes into similar categories. For example, we include 'round', 'sphere', 'oval', and 'circle' in the "Circle" category.
 
 ## Duration
 
-This is the big one. In order to use the duration, we want it to be a number, but it is currently a string, with a ton of variety.
-```{r duration-type}
-class(ufo_raw$Duration)
-```
+The duration field in the submission for is a free-form data entry field, stored as string. This gives reporters the opportunity to input any words they want and leads to an entertaining array of time interval units. 
+Because of this 'flexibility' in the `duration` field, there are `r length(unique(ufo_raw$Duration))` different inputs for this dataset.
 
-Again, this is due to the freeform textbox in the form used to report sightings online. In fact, because of this ability to write whatever you want in the `duration` field, there are `r length(unique(ufo_raw$Duration))` different inputs for this dataset.
-
-```{r duration-length}
-length(unique(ufo_raw$Duration))
-```
-
-This includes some gems, which are everything from simple misspellings to the completely bizarre.
+To enforce just how inconsistent the reporting data can be, let's look at some of the more bizarre measures of time.
 
 ```{r gems-duration}
-print(c(ufo_raw$Duration[23], ufo_raw$Duration[37], ufo_raw$Duration[58], ufo_raw$Duration[86], ufo_raw$Duration[280], ufo_raw$Duration[318], ufo_raw$Duration[111828],ufo_raw$Duration[1213], ufo_raw$Duration[17679], ufo_raw$Duration[65718], ufo_raw$Duration[42052], ufo_raw$Duration[31738] ))
-
-
-```
-
-Here are some examples of the more wordy entries
-```{r bunch-of-string-versions}
-foo <- tolower(sort(ufo_raw$Duration))
-unique(foo[100734:100934])
-# foo[1:3]
+print(ufo_raw$Duration[c(23,37,58,86,280,318,111828,1213,17679,65718,42052,31738)])
 ```
 
 However, the majority follow a common structure which can be exploited. Most entries are a number, a space, and a time frame. For example, "45 seconds" or "5 minutes"
@@ -176,16 +137,17 @@ This was by far the messiest column to deal with. In order to convert the datase
 
 ## Conclusion
 
-The big takeaway from the raw data is that if you ever want to use the data you collect from people, standardize how you store it. For example, don't allow users to input whatever they want or simply suggest the format. Instead, force users to type numbers or choose a dropdown item. Don't underestimate the ability for a user to write something crazy in the input box; just stop them in their tracks.
-
-Big points:
-- Freeform submission is NOT a good idea
-- Standardization will make your data scientists happy later on
-- Don't combine fields into one column (`State` should probably be stored as international and domestic)
-- Don't be afraid to store an unknown value as `NA`
+The primary takeaway from the raw data assessment is that data consistency is key, and should be enforced from data collection to reduce the cleaning process downstream. For example, free form fields should be left for comments or descriptions, while fields that have an inherent structure, should be enforced as such (i.e. duration in time units). As Data Scientists, we should not underestimate the ability for a user to write something crazy in the input box.
 
 
-At this point, take a look at the `part4_cleaning` file to see how we standardized the data to make the EDA possible.
+<!-- Big points: -->
+<!-- - Freeform submission is NOT a good idea -->
+<!-- - Standardization will make your data scientists happy later on -->
+<!-- - Don't combine fields into one column (`State` should probably be stored as international and domestic) -->
+<!-- - Don't be afraid to store an unknown value as `NA` -->
+
+
+<!-- At this point, take a look at the `part4_cleaning` file to see how we standardized the data to make the EDA possible. -->
 
 
 
