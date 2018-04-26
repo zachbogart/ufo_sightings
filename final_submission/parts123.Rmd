@@ -99,7 +99,7 @@ The above graph looks so left skewed because of a few sightings that are reporte
 
 Another good sign is that the most sightings have no NA values. Further, of the reports that are missing some information, they tend to miss only one field, with the State being the most frequent missing feature.
 ```{r na-values}
-visna(ufo_raw, sort = "b")
+visna(ufo_raw[, c('Duration','Shape','State','City','Desc','Summary','Date / Time','Posted' )], sort = "b")
 ```
 
 We will now explore the individual feature quality and cleaning.
@@ -145,6 +145,8 @@ print(ufo_raw$Duration[2:8])
 ```
 
 This was by far the messiest column to deal with. In order to convert the dataset, we write a set of functions to handle all of the corner cases and convert them into numbers on a common scale (in cleaning file).
+
+Further, since there were many unique values of duration, we decided to bin into groups for some analyses. Groups included '<1 min', '1-5min', all the way to '>60 minutes'.
 
 ## Part 3 Summary
 
