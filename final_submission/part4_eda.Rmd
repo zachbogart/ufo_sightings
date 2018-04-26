@@ -1,6 +1,6 @@
 ---
 title: "EDAV Project: UFO Sightings"
-author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Robert Davis DeRodes (rd2804), Zach Bogart (zb2223)"
 date: "4/5/2018"
 output: html_document
 ---
@@ -47,7 +47,7 @@ trump_state <- as_tibble(read_csv("data/TrumpState.csv"))
 
 obese <- as_tibble(read_csv("data/Obesity.csv"))
 
-cbPalette <- c("#56B4E9", "#F0E442", "#E69F00", "#009E73", "#CC79A7", "#0072B2", "#D55E00", "#999999")
+cbPalette <- c("#56B4E9", "#F0E442", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#999999", "#0072B2")
 
 ufo <- ufo %>%
   mutate(Shape2 = fct_relevel(Shape2, "Circle", "Light", "Triangle", "Rectangle", "Other"))
@@ -81,8 +81,6 @@ ggplot(percent_missing, aes(x=Shape1, y=percent_na)) +
   geom_bar(stat='sum',fill='dodgerblue') +
   xlab('Shape') + ylab('% Missing') +
   theme_light() + ggtitle('Percent of Missing Values by Shape') + theme(legend.position = 'none') + scale_y_continuous(labels = percent)
-
-
 
 ```
 
@@ -170,7 +168,7 @@ Zooming in to the sightings less than one hour, we can make a few observations.
 ```{r hour-limit-histogram}
 ufodurclip <- ufo %>% filter(is.na(Duration) == FALSE & Duration <= 3600)
 ggplot(ufodurclip, aes(x = Duration)) + geom_histogram(, color="black", bins=60,fill="springgreen3") +
-  ggtitle("Duration Histogram, Limited to 1 Hour") + scale_y_continuous(name='count (thousands)', labels = c(10,20,30),breaks = c(10000,20000,30000)) + scale_x_continuous(name = "Duration (minutes)", breaks = seq(0,3600,300), labels = seq(0,60,5)) + theme_light()
+  ggtitle("Duration Histogram, Limited to 1 Hour") + scale_y_continuous(name='Sightings (thousands)', labels = c(10,20,30),breaks = c(10000,20000,30000)) + scale_x_continuous(name = "Duration (minutes)", breaks = seq(0,3600,300), labels = seq(0,60,5)) + theme_light()
 ```
 
 Duration of observation is independent of the shape. That is, UFOs of circular shape are  no more or less likely to be seen for a longer amount of time than, say, triangular UFOs. 
@@ -184,7 +182,7 @@ durshape$prop <- durshape$durshapefreq/durshape$durfreq
 ggplot(durshape, aes(x = Shape2, y = prop, fill = Shape2)) +
   geom_bar(stat = "identity") + facet_wrap(~Bin_Dur) +
   ggtitle("Shape Proportion Across Durations") +
-  xlab("Duration in Minutes") + scale_fill_manual(values=cbPalette, name = "Shape") + ylab("Proportion of Sightings")+ theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme_light()
+  xlab("Duration in Minutes") + scale_fill_manual(values=cbPalette, name = "Shape") + scale_y_continuous(labels = percent) + ylab("Proportion of Sightings")+ theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme_light()
 ```
 
 
@@ -334,29 +332,39 @@ ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = 
 The next phase of exploration was looking at our data over time. There is a clear change in the proportion of the shapes of observations since 1950. Long ago a majority of UFO sightings were circles, but over time the proportion of circles clearly shrank, with an marked increase in light, triangles, and rectangles. The spike in NAs are associated with paper logged reports that were backfilled into the database when the site came online in 1998. We show the graph with and without NAs. 
 
 ```{r}
-ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill") + labs(x='Year', y="Relative Frequency") + ggtitle("Relative Frequency of Shapes over Time")
+ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill") + labs(x='Year', y="Relative Frequency") + ggtitle("Relative Frequency of Shapes over Time")+ scale_fill_manual(values = cbPalette, name = 'Duration') + scale_y_continuous(labels = percent)
 
 ufo1950_filtered <- ufo1950 %>% filter(is.na(Shape2) == FALSE)
-ggplot(ufo1950_filtered, aes(x = year, fill = Shape2)) + geom_bar(position = "fill") + labs(x='Year', y="Relative Frequency") + ggtitle("Relative Frequency of Shapes over Time (NA excluded)")
+ggplot(ufo1950_filtered, aes(x = year, fill = Shape2)) + geom_bar(position = "fill") + labs(x='Year', y="Relative Frequency") + ggtitle("Relative Frequency of Shapes over Time (NA excluded)")+ scale_fill_manual(values = cbPalette, name = 'Duration') + scale_y_continuous(labels = percent) 
 ```
 
 In graphing the duration of sightings over time, we can see that duration seems to decrease over time, with a larger proportion of sightings less than 5 minutes. Before 1980 the data is more varied, but as we get closer to 1998 and especially after that, things seemed to even out.
 
 ```{r}
 ufo1950 <- ufo1950 %>% filter(is.na(Bin_Dur) == FALSE)
-ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill") + scale_fill_manual(values = cbPalette, name = 'Duration') + labs(x = "Year", y='Relative Frequency') + ggtitle('Relative Frequency of Sighting Duration')
+ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill") + scale_fill_manual(values = cbPalette, name = 'Duration') + labs(x = "Year", y='Relative Frequency') + ggtitle('Relative Frequency of Sighting Duration')+ scale_y_continuous(labels = percent)
 ```
 
 
 
 This graph exemplifies how the proportion of durations varies wildly before 1995, but after 1995 the proportion of durations of observations became less variable. 
 
+```{r, echo = FALSE}
+
+temp2 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
+temp2 <- merge(ufo, temp2, by = "year")
+shape_overtime <- temp2 %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
+ggplot(shape_overtime, aes(year, Prop, color = Shape2)) + geom_line() +
+    ggtitle("Saucers Become Out of Style") +
+    labs (x = "Year", y = "Proportion of Sightings") +  scale_color_manual(values=cbPalette, name = "Shape")+ scale_y_continuous(labels = percent)
+```
+
 ```{r}
 temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
 temp3 <- merge(ufo, temp3, by = "year")
 dur_overtime <- temp3 %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
 ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
-    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") + theme_light() + scale_color_manual(values=cbPalette, name = "Shape")
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") + theme_light() + scale_color_manual(values=cbPalette, name = "Shape")+ scale_y_continuous(labels = percent)
 
 
 ```
