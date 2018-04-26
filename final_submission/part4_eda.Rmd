@@ -7,7 +7,8 @@ output: html_document
 
 # 4 Main Analysis
 **Note: the data is zipped in the data folder when downloaded and must be unzipped in order to read**
-## EDA
+
+## Exloratory Data Analysis
 
 This file explores the cleaned version of the dataset provided by the ['part4_cleaning.rmd'](https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/part4_cleaning.Rmd) file.
 
@@ -202,6 +203,7 @@ ggplot(ufo, aes(as.POSIXct(Time))) +
 ```
 
 We can also observe that there are significantly more sightings during the warmer months of the year (noting that all of the reports are in the northern hemisphere). We suspect that these are the months where people are more inclined to spend time outside and therefore have more opportunity to observe the UFOs. 
+
 ```{r freq_by_month, echo=FALSE}
 ufoAmerica <- ufo %>% filter(is.na(In_USA) == FALSE && In_USA == TRUE)
 ggplot(ufo, aes(month)) +
@@ -215,6 +217,7 @@ ggplot(ufo, aes(month)) +
 Now lets focus on the 'description' field. This field is rightfully free form, and allows us to do some text-based analysis. First, we will look at how descriptive the reports are and if there are any other features that entice reporters to provide longer descriptions. Later (see part67.rmd) we consider the word frequency and two-word affinity within comments.
 
 We can see that descriptions tend to be 200 words or less with a mean around 100 words, but there is a significant percentage of descriptions that exceed 400 words.
+
 ```{r freq_by_word_count, echo = FALSE}
 
 ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
@@ -247,7 +250,7 @@ ggplot(temp8, aes(Time, freq, color = Shape2)) + geom_line() + facet_wrap(~Shape
     labs (x = "Time", y = "Sightings") +  scale_color_manual(values=cbPalette, name = "Shape") + theme_fivethirtyeight()
 ```
 
-### Geospatial Analysis
+## Geospatial Analysis
 
 Before pursuing any geography based analysis, we must control for population density, as most of the most popular states (California) have large numbers of sightings due to it's size. This is seen in the graph below showing absolute number of sightings per state.
 
@@ -256,7 +259,7 @@ ufostate <- ufo %>% filter(is.na(State) == FALSE & In_USA == TRUE)
 
 
 ggplot(ufostate, aes(x = State)) + geom_bar() +
-  ggtitle("Sightings by State (no population correction)") + theme_light() + theme(axis.text.x=element_text(angle=60, hjust = 1)) 
+  ggtitle("Sightings by State (no population correction)") + theme_light() + theme(axis.text.x=element_text(angle=60, hjust = 1)) + ylab('Sightings')
 
 ```
 
@@ -292,6 +295,7 @@ We use three different proxies to closely explore the correlation between amount
 As there is no measure for how much time people spend outside, we believe that these 3 proxies are likely correlated with outdoor activity. 
 
 All three of these graphs show a clear correlation. Though there are many individual states that do not follow this pattern, overall the trend is clear - more exercise is correlated with more UFO sightings and a lower percentage of obese adults is correlated with more UFO sightings. 
+
 ```{r}
 
 USA_ufo_summary2 <- USA_ufo_merged %>% filter(year >= 2009) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population) 
@@ -330,17 +334,17 @@ ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = 
 The next phase of exploration was looking at our data over time. There is a clear change in the proportion of the shapes of observations since 1950. Long ago a majority of UFO sightings were circles, but over time the proportion of circles clearly shrank, with an marked increase in light, triangles, and rectangles. The spike in NAs are associated with paper logged reports that were backfilled into the database when the site came online in 1998. We show the graph with and without NAs. 
 
 ```{r}
-ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill")
+ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill") + labs(x='Year', y="Relative Frequency") + ggtitle("Relative Frequency of Shapes over Time")
 
 ufo1950_filtered <- ufo1950 %>% filter(is.na(Shape2) == FALSE)
-ggplot(ufo1950_filtered, aes(x = year, fill = Shape2)) + geom_bar(position = "fill")
+ggplot(ufo1950_filtered, aes(x = year, fill = Shape2)) + geom_bar(position = "fill") + labs(x='Year', y="Relative Frequency") + ggtitle("Relative Frequency of Shapes over Time (NA excluded)")
 ```
 
 In graphing the duration of sightings over time, we can see that duration seems to decrease over time, with a larger proportion of sightings less than 5 minutes. Before 1980 the data is more varied, but as we get closer to 1998 and especially after that, things seemed to even out.
 
 ```{r}
 ufo1950 <- ufo1950 %>% filter(is.na(Bin_Dur) == FALSE)
-ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill") + scale_fill_manual(values = cbPalette, name = 'Duration')
+ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill") + scale_fill_manual(values = cbPalette, name = 'Duration') + labs(x = "Year", y='Relative Frequency') + ggtitle('Relative Frequency of Sighting Duration')
 ```
 
 
@@ -352,7 +356,7 @@ temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %
 temp3 <- merge(ufo, temp3, by = "year")
 dur_overtime <- temp3 %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
 ggplot(dur_overtime, aes(year, Prop, color = Bin_Dur)) + geom_line() +
-    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") + theme_light()
+    ggtitle("UFO Sighting Durations Over Time") + labs(x = "Year", y = "Proportion of Sightings") + theme_light() + scale_color_manual(values=cbPalette, name = "Shape")
 
 
 ```
@@ -369,7 +373,3 @@ ggplot(truedur_overtime, aes(year, AvgDur)) + geom_line() +
 ```
 
 
-
-
-
-#### Comments
