@@ -246,12 +246,7 @@ ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40, fill='dodgerblue') + 
 <div id="part-3-summary" class="section level2">
 <h2>Part 3 Summary</h2>
 <p>The primary takeaway from the raw data assessment is that data consistency is key, and should be enforced from data collection to reduce the cleaning process downstream. For example, free form fields should be left for comments or descriptions, while fields that have an inherent structure, should be enforced as such (i.e. duration in time units). As Data Scientists, we should not underestimate the ability for a user to write something crazy in the input box.</p>
-<!-- Big points: -->
-<!-- - Freeform submission is NOT a good idea -->
-<!-- - Standardization will make your data scientists happy later on -->
-<!-- - Don't combine fields into one column (`State` should probably be stored as international and domestic) -->
-<!-- - Don't be afraid to store an unknown value as `NA` -->
-<!-- At this point, take a look at the `part4_cleaning` file to see how we standardized the data to make the EDA possible. -->
+<p>At this point, take a look at the <code>part4_cleaning</code> file to see how we standardized the data to make the EDA possible.</p>
 </div>
 </div>
 

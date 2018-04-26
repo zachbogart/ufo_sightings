@@ -641,4 +641,4 @@ summary(ufo_clean)
 ```
 
 At this point, we have a clean dataset and are ready to proceed with analysis. 
-EDA material can be found in `part4_eda.rmd`
+EDA material can be found in `part4_eda` files.
