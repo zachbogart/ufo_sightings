@@ -13,7 +13,7 @@ The main questions we wanted to answer were:
 
 * Do different shapes of UFOs behave differently?  
 * Have UFO patterns remained constant over time? (This dataset has enough observations since the 1950’s to answer these questions)
-* Where do UFO sighitngs occur?
+* Where do UFO sightings occur?
 * Is there insight into the reasons why these patterns exist?
 
 What we did:
