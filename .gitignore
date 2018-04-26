@@ -4,7 +4,6 @@
 .Ruserdata
 clean_ufos_cache/
 clean_ufos_files/
-*.html
 FinalWriteup_cache/
 FinalWriteup_files/
 *_cache
