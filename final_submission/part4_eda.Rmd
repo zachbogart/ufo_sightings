@@ -28,11 +28,13 @@ library(scales)
 library(micromapST)
 library(statebins)
 library(lubridate)
+library(fiftystater)
+library(ggrepel)
 ```
 
 To begin, we read in the cleaned data as well as some additional data we will compare against later on. For this analysis, we binned the shapes into five categoriexs.
 ```{r add-data, warning=FALSE}
-ufo <- as_tibble(read_csv("data/ufo_clean_final.csv"))
+ufo <- as_tibble(read_csv("data/ufo_clean.csv"))
 ufo <- ufo %>% select(-X1, -X1_1)
 
 state_pops <- as_tibble(read_csv("data/StatePops.csv"))
@@ -245,10 +247,6 @@ ufostate <- ufo %>% filter(is.na(State) == FALSE & In_USA == TRUE)
 ggplot(ufostate, aes(x = State)) + geom_bar() +
   ggtitle("Sightings by State (no population correction)") + theme_light() + theme(axis.text.x=element_text(angle=60, hjust = 1)) 
 
-library(fiftystater)
-
-
-
 ```
 
 
@@ -274,17 +272,26 @@ ggplot(USA_ufo_summary, aes(x = reorder(State, -Prop), y = Prop)) + geom_bar(sta
 
 #### Extraterrestrial Correlations
 
-We use three different proxies to closely explore the correlation between amount of time spent outside with frequency of UFO sightings.: Hours a day spent doing Sports, Excercise, and Recreation (https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm), Percentage of Population Engaged in Sports and Recreation daily (http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html ), and Obesity rate (https://stateofobesity.org/adult-obesity/). As there is no measure for how much time people spend outside, we believe that most people are outside to excercise and these 3 proxies are at the least correlated with outdoor activity. Because all of our 3 proxies come to similar conclusions, we confirm this correlation.
+We use three different proxies to closely explore the correlation between amount of time spent outside with frequency of UFO sightings: 
 
+* Hours a day spent doing Sports, Excercise, and Recreation (https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm)
+* Percentage of Population Engaged in Sports and Recreation daily (http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html )
+* Obesity rate (https://stateofobesity.org/adult-obesity/). 
+
+As there is no measure for how much time people spend outside, we believe that these 3 proxies are likely correlated with outdoor activity. 
+
+All three of these graphs show a clear correlation. Though there are many individual states that do not follow this pattern, overall the trend is clear - more exercise is correlated with more UFO sightings and a lower percentage of obese adults is correlated with more UFO sightings. 
 ```{r}
-library(ggrepel)
+
 USA_ufo_summary2 <- USA_ufo_merged %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
 USA_ufo_summary2 <- merge(USA_ufo_summary2, excer, by = "State")
-ggplot(USA_ufo_summary2, aes(x = ATUS, y = Prop)) + geom_point(stat = "identity") + labs(x = "Minutes a day spent doing Sports, Excercise, Recreation", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State)+ geom_smooth(method='lm',formula=y~x) + theme_light() + scale_x_continuous(breaks = seq(0,.7,.1),labels = seq(0,42,6))
+ggplot(USA_ufo_summary2, aes(x = ATUS, y = Prop)) + geom_point(stat = "identity") + labs(x = "Minutes a day spent doing Sports, Excercise, Recreation", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State)+ geom_smooth(method='lm',formula=y~x) + theme_light() + scale_x_continuous(breaks = seq(0,.7,.1),labels = seq(0,42,6)) +
+ggtitle("Sightings by Exercise")
 ```
 
+
 ```{r}
-ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x) + theme_light()
+ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x) + theme_light() + ggtitle("Sightings by Population engaged in Sports/Exercise")
 
 ```
 
@@ -295,10 +302,10 @@ ggplot(USA_ufo_summary2, aes(x = Obesity, y = Prop)) + geom_point(stat = "identi
 
 ```
 
-We can in fact conclude with confidence that states where residents are more likely to spend time outside are also more likely to observe UFOs. This seemingly trivial result confirms our common sense perception that you have to spend time looking at the sky to see something unidentifiable.
+Given this evidence, we have confidence that states where residents are more likely to spend time outside are also more likely to observe UFOs. This seemingly trivial result confirms our common sense perception that you have to spend time looking at the sky to see something unidentifiable.
 
 
-We wanted to see if other state-by-state features were correlated with sightings per 10,000 residents. One of the most interesting was to see if political affiliation would be correlated with sightings per 10,000 residents. Filtering for obervations in the last four years, we can see a slight negative trend with Donald Trump's 2016 election margin by state. Though this is open for interpretation, in our opinion, we find it likely that Trump voters are much less likely to spend time outside.  
+We wanted to see if other state-by-state features were correlated with sightings per 10,000 residents, including political affiliation. Filtering for obervations in the last four years, we can see a slight negative trend with Donald Trump's 2016 election margin by state. Though this is open for interpretation, in our opinion, we find it likely that Trump voters are much likely to spend time outside/exercising. 
 
 
 ```{r}
@@ -307,61 +314,22 @@ USA_ufo_summary3 <- merge(USA_ufo_summary3, trump_state, by = "State")
 ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary3$State) + geom_smooth(method='lm',formula=y~x) + theme_light()
 ```
 
-Unlike shape and duration, there is a clear change in the proportion of the shapes of observations since 1950. The obvious one is The proportion of circles clearly goes down and the proportion of light and triangles go up. 
+The next phase of exploration was looking at our data over time. There is a clear change in the proportion of the shapes of observations since 1950. Long ago a majority of UFO sightings were circles, but over time the proportion of circles clearly shrank, with an marked increase in light, triangles, and rectangles.
 
 ```{r}
-
 ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar(position = "fill")
-ggplot(ufo1950, aes(x = year, fill = Shape2)) + geom_bar()
-
-
 ```
 
-It appears in this graph that also the duration of sightings decreases with time. 
+In graphing the duration of sightings over time, we can see that duration seems to decrease over time, with a larger proportion of sightings less than 5 minutes. Before 1980 the data is more varied, but as we get closer to 1998 and especially after that, things seemed to even out.
 
 ```{r}
 ufo1950 <- ufo1950 %>% filter(is.na(Bin_Dur) == FALSE)
 ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill")
-ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar()
-
-
-
 ```
 
-We can see here that there was a large increase in both circle and light sightings in between 2010 and 2015, while rectangular and triangular have for the most part remained constant. 
-
-```{r}
-
-shape_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2) %>% summarize(freq = n())
-ggplot(shape_overtime, aes(year, freq, color = Shape2)) + geom_line() +
-    ggtitle("UFO Sighting Shapes Overtime") +
-    labs (x = "Year", y = "Frequency")
-```
-
-It appears from this graph that longer duration sightings longer than 30 minutes has been relatively constant, while there has been a proliferation, particularly since 2010 of short duration observations. 
-
-```{r}
-dur_overtime <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year, Bin_Dur) %>% summarize(freq = n())
-ggplot(dur_overtime, aes(year, freq, color = Bin_Dur)) + geom_line() +
-    ggtitle("UFO Sighting Durations Overtime") +
-    labs (x = "Year", y = "Frequency")
 
 
-```
-
-Moving back in time to 1950, a much large proportion of shapes were circles, but as time progressed circles became less proportional and moved towards the same range as the others.
-
-```{r}
-
-temp2 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
-temp2 <- merge(ufo, temp2, by = "year")
-shape_overtime <- temp2 %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
-ggplot(shape_overtime, aes(year, Prop, color = Shape2)) + geom_line() +
-    ggtitle("UFO Sighting Shapes Over Time") +
-    labs (x = "Year", y = "Proportion of Sightings")
-```
-
-As one can see here the proportion of durations was incredibly variable before 1995, but after 1995 the proportion of durations of observations became less variable. 
+This graph exemplifies how the proportion of durations was incredibly variable before 1995, but after 1995 the proportion of durations of observations became less variable. 
 
 ```{r}
 temp3 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
