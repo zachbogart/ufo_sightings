@@ -1,19 +1,30 @@
 ---
 title: "EDAV Project: UFO Sightings"
-author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Robert Davis DeRodes (rd2804), Zach Bogart (zb2223)"
 date: "4/5/2018"
 output: html_document
 ---
 
 # 1 Introduction
-*Explain why you chose this topic, and the questions you are interested in studying.*
-*List team members and a description of how each contributed to the project.*
 
 Humans yearn to give meaning to anything and everything. When it was discovered that Earth was a planet existing in a larger space, it was immediately theorized that there could be alien life in this unexplored space. To this day, there is constant thought and theorizing about the existence of extraterrestrial life, from scientific papers backed by observational evidence to explosive films exploring imaginary invasions. The data we are exploring contains documented UFO sightings. When someone sees something in the sky they cannot explain, they can call and report a sighting or simply fill out a form online. If aliens constantly visit our planet, they would likely have a clear pattern they use to choose target locations and times.  We want to explore this data to try and extract patterns from the randomness. 
 
+The main questions we wanted to answer were:
+
+* Do different shapes of UFOs behave differently?  
+* Have UFO patterns remained constant over time? (This dataset has enough observations since the 1950’s to answer these questions)
+* Where do UFO sighitngs occur?
+* Is there insight into the reasons why these patterns exist?
+
+What we did:
+
+* Josh: D3 interactive, EDA
+* Ramy: D3 interactive, report cleanup, data scraping
+* Davis: EDA, executive summary, research/other datasets
+* Zach: EDA, data cleaning, writeup
+
 
 # 2 Description of Data
-*Describe how the data was collected, how you accessed it, and any other noteworthy features.*
 
 Our data was scraped off of the National UFO Reporting Center’s (NUFORC) website’s event summary page (http://www.nuforc.org/webreports/ndxevent.html) on March 31, 2018. The NUFORC’s primary channel through which they receive sightings is via their telephone hotline, which is staffed 24 hours a day. The NUFORC also receives sighting reports including images and video via email. They recommend that a summary of the event be written in a pre-specified form they have available on their website. The NUFORC is headquartered in Davenport, WA (East Washington). 
 
@@ -23,10 +34,10 @@ The events summary page has events that go back as far as 1561 (where the artist
 We developed a python script to scrape the data from http://www.nuforc.org/webreports/. There is one index page for each month that contains links to detailed description of each UFO sighting. Using a html parsing package named BeautifulSoup, the script goes through each of these links to extract the data fields including date/time of observation, shape, city, state, duration, and full description. The source code can be viewed as an [html file](https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/getUfoData.html) or as an [iPython notebook](Source code can be viewed as an [html file|https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/getUfoData.ipynb])
 
 #### Two-word affinity
-We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. This data is visualized in the d3 force diagram. Source code can be viewed as an [html file](https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/common_words_python.html) or as an [iPython notebook](Source code can be viewed as an [html file|https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/common_words_python.ipynb])
+We wanted to explore how common descriptors are used together in a description of a UFO observation. To do so, we implemented a Word Count program using Spark and Python. To normalize the data and address grammatical differences between words (i.e. light and lights), we used stop words and stemming procedures from the natural language processing library NLTK. Then we calculate the frequency of every word across all descriptions. Then, we count how often two words appear in the same description. Source code can be viewed as an [html file](https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/common_words_python.html) or as an [iPython notebook](Source code can be viewed as an [html file|https://github.com/zachbogart/ufo_sightings/blob/master/final_submission/common_words_python.ipynb]). This data is visualized in the d3 force diagram (see Part 6).
 
 #### External Dataset
-To better explore our theories behind UFO sighting locations, we used several external datasets. Our data for how many hours a day people at the state level spend on Sports, Exercise, and Recreation and the percentage of people in a state that engaged in sports or exercise in a given day came from the American Time Use Survey. The ATUS is conducted by the Bureau of Labor Statistics. The data in the survey we used was collected from 2009-2015 via phone interviews in which interviewees were asked to recount the activities of their day. http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html
+To better explore our theories behind UFO sighting locations, we used several external datasets. Our data for how many hours a day people at the state level spend on sports, exercise, and recreation and the percentage of people in a state that engaged in sports or exercise in a given day came from the American Time Use Survey. The ATUS is conducted by the Bureau of Labor Statistics. The data in the survey we used was collected from 2009-2015 via phone interviews in which interviewees were asked to recount the activities of their day. http://www.governing.com/topics/urban/gov-americans-time-use-survey-2015.html
 https://www.bls.gov/spotlight/2017/sports-and-exercise/home.htm
 
 Our data on state level obesity came from https://stateofobesity.org/adult-obesity/, an American watchdog organization on obesity in the United States. State of Obesity received their data from the CDC’s Behavioral Risk Factor Surveillance System dataset, a cross sectional study conducted over the phone. 
@@ -40,6 +51,8 @@ The results by state of the 2016 election were accessed from https://www.politic
 In this section we look at the data in its raw form and see what we will need to do in order to fix it for analysis. All of the cleaning of the data is done in `part4_cleaning.Rmd`. Here we are just assessing the ingredients before we go and bake up some tasty graphs and tables.
 
 Because we scraped the data off of a website, it started out in a rather raw form. Using a python script with Beautiful Soup, we were able to collect all of the UFO Sightings listed on the NUFORC site.
+
+**Note: the data is zipped in the data folder when downloaded and must be unzipped in order to read**
 ```{r setup, include=FALSE}
 # knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
 knitr::opts_chunk$set(warning = FALSE,
@@ -64,9 +77,9 @@ library(maps)
 
 ```{r pull-in-data}
 # read in raw data
-ufo_raw <- as_tibble(read_csv("data/ufo_data.csv"))
+ufo_raw <- as_tibble(read_csv("data/ufo_data_final.csv"))
 
-print(head(ufo_raw, 5))
+head(ufo_raw, 5)
 ```
 
 Looking at the data, there is a lot of inconsistency that needs to be corrected. This stems from the fact that sightings are reported using an online form that does not enforce data type in collection. Looking at the NUFORC submission form (http://www.ufocenter.com/reportformsubmit.html), there are suggestions for how you should format the report, but they are not required nor enforced. For example, where it asks for "Number of Witnesses" I could type in "foo" and the site will accept the submission. This is evident in the results we see in the raw data.
@@ -78,7 +91,7 @@ First off, the dataset has `r nrow(ufo_raw)` reported sightings spanning centuri
 ```{r basic-histogram-and-row-count}
 # print(nrow(ufo_raw))
 library(scales)
-ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40, fill='dodgerblue') + ggtitle("The Skewing by Old-Timey Sightings") + scale_y_continuous(name='count (thousands)', labels = c(20,40,60,80),breaks = c(20000,40000,60000,80000)) + geom_vline(xintercept = 1974, color="red") + theme_light()
+ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40, fill='dodgerblue') + ggtitle("The Skewing by Old-Timey Sightings") + scale_y_continuous(name='Sightings (in thousands)', labels = c(20,40,60,80),breaks = c(20000,40000,60000,80000)) + geom_vline(xintercept = 1974, color="red") + theme_light() +xlab("Year")
 
 ```
 
