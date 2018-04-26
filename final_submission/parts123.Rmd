@@ -46,7 +46,6 @@ https://stateofobesity.org/adult-obesity/
 The results by state of the 2016 election were accessed from https://www.politico.com/mapdata-2016/2016-election/results/map/president/ . 
 
 # 3 Analysis of Data Quality
-*Provide a detailed, well-organized description of data quality, including textual description, graphs, and code.*
 
 In this section we look at the data in its raw form and see what we will need to do in order to fix it for analysis. All of the cleaning of the data is done in `part4_cleaning.Rmd`. Here we are just assessing the ingredients before we go and bake up some tasty graphs and tables.
 

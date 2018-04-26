@@ -1,6 +1,6 @@
 ---
 title: "EDAV Project: UFO Sightings"
-author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Davis DeRodes (rd2804), Zach Bogart (zb2223)"
+author: "Josh Feldman (jbf2159), Ramy Jaber (rij2105), Robert Davis DeRodes (rd2804), Zach Bogart (zb2223)"
 date: "4/5/2018"
 output: html_document
 ---
