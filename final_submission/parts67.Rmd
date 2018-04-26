@@ -35,5 +35,17 @@ Given more time, we would add much more customization to this visualization. Our
 # 7 Conclusion
 *Discuss limitations and future directions, lessons learned.*
 
+#### Limitations
+Our biggest limitation was probably the dataset itself. It was presented in a very raw format which required a lot of cleaning (see below).
+
+#### Future Directions
+In the future, we would be interested in expanding the scope to see if we could uncover more salient patterns within the dataset. In exploring the datset, we contacted the NUFORC through their hotline and they suggested that patterns may emerge if we connect known missle/aircraft testing to the reported sightings. It would be interesting to explore this claim further and see if removing sightings that relate to known activity cause any patterns to remain. It would also be interesting if we could get more granular information about the location of the sighting. We considered trying to plot latitude and longitude but decided that the town would be too broad to see any intersting differentiation. 
+
+#### Lessons Learned
+One of the biggest problems we faced working with this dataset was its formatting. The data was collected using online forms with no standardization for inputs, meaning people wrote whatever they wanted, regardless of the field. This meant it became very difficult to parse the data into a format like numbers that allowed for data analysis without sacrificing some context of what the user had input. We found ourselves making a lot of decisions on the user’s behalf. What does “minutes” mean? What about “hours”? “I don’t know”? A lot of the data we collected turned into data we created using clues from the form. Although it was difficult to work with the data, it was a good learning experience about the data science process. Working with data starts with getting the data in such a way that later on, when it comes down to analysing the results, data scientists don’t have to spend all their time massaging the data so they can work with it.
+
+#### Summary
+Overall, this dataset was an interesting exploration into a novel subject matter as well as good exposure to how data is collected in the real world. In order to make data science easier, it must become the norm that when collecting data, there is effort taken to make it easy to work with later. In other words, having data recorded is not the smae as having something meaningful you can work with. It takes effort to collect data people want to work with.
+
 
 
