@@ -6,13 +6,11 @@ output: html_document
 ---
 
 # 1 Introduction
-TODO
 *Explain why you chose this topic, and the questions you are interested in studying.*
 *List team members and a description of how each contributed to the project.*
-Notes:
-- We wanted to pick a dataset that was fun
-- UFO Sightings was a perfect fit
-- Interested in what people talk about in a sighting what they say they see
+
+Humans yearn to give meaning to anything and everything. When it was discovered that Earth was a planet existing in a larger space, it was immediately theorized that there could be alien life in this unexplored space. To this day, there is constant thought and theorizing about the existence of extraterrestrial life, from scientific papers backed by observational evidence to explosive films exploring imaginary invasions. The data we are exploring contains documented UFO sightings. When someone sees something in the sky they cannot explain, they can call and report a sighting or simply fill out a form online. If aliens constantly visit our planet, they would likely have a clear pattern they use to choose target locations and times.  We want to explore this data to try and extract patterns from the randomness. 
+
 
 # 2 Description of Data
 *Describe how the data was collected, how you accessed it, and any other noteworthy features.*
@@ -135,7 +133,7 @@ print(ufo_raw$Duration[2:8])
 
 This was by far the messiest column to deal with. In order to convert the dataset, we write a set of functions to handle all of the corner cases and convert them into numbers on a common scale (in cleaning file).
 
-## Conclusion
+## Part 3 Summary
 
 The primary takeaway from the raw data assessment is that data consistency is key, and should be enforced from data collection to reduce the cleaning process downstream. For example, free form fields should be left for comments or descriptions, while fields that have an inherent structure, should be enforced as such (i.e. duration in time units). As Data Scientists, we should not underestimate the ability for a user to write something crazy in the input box.
 
