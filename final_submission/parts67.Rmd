@@ -10,10 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # 6 Interactive Component
-*Clarity of presentation, including instructions*
-*Technical execution (include a description of what you would work on in the future, what you've attempted, etc. so we know it's on your radar)*
 
-For the interactive component, we were interested in making the dataset easier to explore that it was for us to work with. To do this, we made a force diagram that allowed people to interact with the data naturally and easily see the connections between different sightings in terms of language used.
+For the interactive component, we were interested in making the dataset easier to explore than it was for us to work with. To do this, we made a force diagram that allowed people to interact with the data naturally, and easily see the connections between different sightings in terms of language used.
 
 Instructions are included on the site, copied here:
 
@@ -22,7 +20,7 @@ Click a word to see some of the descriptions it belongs to!
 
 https://bl.ocks.org/JoshFeldman777/raw/d24a1f44cc18527815701ecf997cf538/488f28e319c4ed33839e634bd3fba512ab3df602/
 
-We feel it's neccesary to acknowledge the use of circles in our visualization. The trouble with area-scaled circles is that users have trouble discerning the difference in value between circles of different sizes. We decided to use circles despite this flaw because the point of the visualization was not to see the minute differences in sizes between circles, but rather the connections between words. If the user wants to see the exact frequency of a word they can click on the word and view the count. Using the size of the circles simply gives the user a glimpse at relative frequency of all the circles, while the highlighting of words that appear in a bigram and display of comments are the strongest features that help individuals look for realtionships between words in the comments of our dataset.
+We feel it's necessary to acknowledge the use of circles in our visualization. The trouble with area-scaled circles is that users have trouble discerning the difference in value between circles of different sizes. We decided to use circles despite this flaw because the point of the visualization was not to see the minute differences in sizes between circles, but rather the connections between words. If the user wants to see the exact frequency of a word they can click on the word and view the count. Using the size of the circles simply gives the user a glimpse at relative frequency of all the circles, while the highlighting of words that appear in a bigram and display of comments are the strongest features that help individuals look for relationships between words in the comments of our dataset.
 
 Given more time, we would add much more customization to this visualization. Our main bottleneck was a need to precompute the unigram and bigram frequencies, as creating them on the fly would drastically slow down the visualization. We considered adding each of the following items:
 
@@ -33,19 +31,18 @@ Given more time, we would add much more customization to this visualization. Our
 
 
 # 7 Conclusion
-*Discuss limitations and future directions, lessons learned.*
 
 #### Limitations
 Our biggest limitation was probably the dataset itself. It was presented in a very raw format which required a lot of cleaning (see below).
 
 #### Future Directions
-In the future, we would be interested in expanding the scope to see if we could uncover more salient patterns within the dataset. In exploring the datset, we contacted the NUFORC's director, Dr. Davenport, who suggested that patterns may emerge if we connect known missle/aircraft testing to the reported sightings. Another possibility would to be to use clustering and unsupervised learning techniques with the features and the comments to possibly identify missles and other observations that we do not want in our dataset. It would also be interesting if we could get more granular information about the location of the sighting. We considered trying to plot latitude and longitude, but decided that merely plotting on city would lead to a large amount of overlap and would be inaccurate as it would not be the direct location of the sighting. 
+In the future, we would be interested in expanding the scope to see if we could uncover more salient patterns within the dataset. In exploring the dataset, we contacted the NUFORC's director, Dr. Davenport, who suggested that patterns may emerge if we connect known missile/aircraft testing to the reported sightings. Another possibility would to be to use clustering and unsupervised learning techniques with the features and the comments to possibly identify missiles and other observations that we do not want in our dataset. It would also be interesting if we could get more granular information about the location of the sighting. We considered trying to plot latitude and longitude, but decided that merely plotting on city would lead to a large amount of overlap and would be inaccurate as it would not be the direct location of the sighting. 
 
 #### Lessons Learned
-One of the biggest problems we faced working with this dataset was its formatting. The data was collected using online forms with no standardization for inputs, meaning people wrote whatever they wanted, regardless of the field. This meant it became very difficult to parse the data into a format like numbers that allowed for data analysis without sacrificing some context of what the user had input. We found ourselves making a lot of decisions on the user’s behalf. What does “minutes” mean? What about “hours”? “I don’t know”? A lot of the data we collected turned into data we created using clues from the form. Although it was difficult to work with the data, it was a good learning experience about the data science process. Working with data starts with getting the data in such a way that later on, when it comes down to analysing the results, data scientists don’t have to spend all their time massaging the data so they can work with it.
+One of the biggest problems we faced working with this dataset was its formatting. The data was collected using online forms with no standardization for inputs, meaning people wrote whatever they wanted, regardless of the field. This meant it became very difficult to parse the data into a format like numbers that allowed for data analysis without sacrificing some context of what the user had input. We found ourselves making a lot of decisions on the user’s behalf. What does “minutes” mean? What about “hours”? “I don’t know”? A lot of the data we collected turned into data we created using clues from the form. Although it was difficult to work with the data, it was a good learning experience about the data science process. Working with data starts with getting the data in such a way that later on, when it comes down to analyzing the results, data scientists don’t have to spend all their time massaging the data so they can work with it.
 
 #### Summary
-Overall, this dataset was an interesting exploration into a novel subject matter as well as good exposure to how data is collected in the real world. In order to make data science easier, it must become the norm that when collecting data, there is effort taken to make it easy to work with later. In other words, having data recorded is not the smae as having something meaningful you can work with. It takes effort to collect data people want to work with.
+Overall, this dataset was an interesting exploration into a novel subject matter as well as good exposure to how data is collected in the real world. In order to make data science easier, it must become the norm that when collecting data, there is effort taken to make it easy to work with later. In other words, having data recorded is not the same as having something meaningful you can work with. It takes effort to collect data people want to work with.
 
 
 
