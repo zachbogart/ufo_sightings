@@ -82,7 +82,7 @@ ggplot(ufo_raw, aes(x = year)) + geom_histogram(bins = 40, fill='dodgerblue') + 
 
 ```
 
-The above graph looks so left skewed because of a few sightings that are reported to have occurred anywhere between 1400 and 1800. These sightings may need to be ignored in order to better understand the behavior of the dataset without skewing the results. There are just `r count(filter(ufo_raw, year<1900))`. Although these sightings are a consideration, they are a relatively small percentage of the total dataset. In fact, the vast majority of sightings occur after the founding the the NUFORC in 1974 (http://www.nuforc.org/General.html), which is a good sign for data quality.
+The above graph looks so left skewed because of a few sightings that are reported to have occurred anywhere between 1400 and 1800. These sightings may need to be ignored in order to better understand the behavior of the dataset without skewing the results. There are just `r count(filter(ufo_raw, year<1900))`. Although these sightings are a consideration, they are a relatively small percentage of the total dataset. In fact, the vast majority of sightings occur after the founding the the NUFORC in 1974 (http://www.nuforc.org/General.html), which is a good sign for data quality. The founding of the NUFORC is shown in red on the above graph.
 
 Another good sign is that the most sightings have no NA values. Further, of the reports that are missing some information, they tend to miss only one field, with the State being the most frequent missing feature.
 ```{r na-values}
