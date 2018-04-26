@@ -304,7 +304,7 @@ We wanted to see if other state-by-state features were correlated with sightings
 ```{r}
 USA_ufo_summary3 <- USA_ufo_merged %>% filter(year >= 2014 & State != "DC") %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
 USA_ufo_summary3 <- merge(USA_ufo_summary3, trump_state, by = "State")
-ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary3$State) + geom_smooth(method='lm',formula=y~x) + theme_light
+ggplot(USA_ufo_summary3, aes(x = `Trump Margin`, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Popular Vote for Donald Trump in 2016", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary3$State) + geom_smooth(method='lm',formula=y~x) + theme_light()
 ```
 
 Unlike shape and duration, there is a clear change in the proportion of the shapes of observations since 1950. The obvious one is The proportion of circles clearly goes down and the proportion of light and triangles go up. 
