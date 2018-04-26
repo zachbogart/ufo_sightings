@@ -135,7 +135,7 @@ $(document).ready(function () {
 <p>We separated it from the rest of the analysis to make it easier to work with the files and since knitting the document would either take a while or cache a lot.</p>
 <p>Let’s get cleaning! The dataset was scraped from the <a href="http://www.nuforc.org/">National UFO Reporting Center</a>. Initially, the data was quite disorganized. Here is a look at the raw data. Before reading in the data, we considered <code>unknown</code> to be considered as an <code>NA</code> value. There were two observations (row number 3974, 74439) that did not work with our data cleaning process due to it’s strange formatting.</p>
 <pre class="r"><code># read in raw data
-ufo &lt;- as_tibble(read_csv(&quot;data/ufo_data.csv&quot;, na=c('unknown', '', 'Unknown')))
+ufo &lt;- as_tibble(read_csv(&quot;data/ufo_data_final.csv&quot;, na=c('unknown', '', 'Unknown')))
 #Bad Eggs
 ufo &lt;- ufo[-c(3974, 74439),]
 print(head(ufo, n=5))</code></pre>
@@ -790,7 +790,7 @@ table(ufo$Shape)</code></pre>
 ##         1      2051      3571         1     23342      7924      5149 
 ##   pyramid rectangle     round    sphere  teardrop  triangle 
 ##         1      1904         2      7573      1041     10719</code></pre>
-<p>We also added a column to track the length of the description by word count.</p>
+<p>We also got the description length to use for size of sighting report.</p>
 <pre class="r"><code>#Add Description Length
 countWords &lt;- function(entry){
   numWords &lt;- lengths(gregexpr(&quot;\\W+&quot;, entry)) + 1
@@ -801,7 +801,7 @@ countWords &lt;- function(entry){
 ufo &lt;- ufo %&gt;%
   rowwise() %&gt;%
   mutate(
-    DescriptionLength = countWords(`Desc`),
+    DescriptionLength = countWords(Desc),
   )
 
 print(head(ufo, n=5))</code></pre>
@@ -819,16 +819,18 @@ print(head(ufo, n=5))</code></pre>
 ## #   DescriptionLength &lt;dbl&gt;</code></pre>
 <p>Finally, we write the results to an new CSV and use that file in our analysis.</p>
 <pre class="r"><code>sapply(ufo, class)</code></pre>
-<pre><code>##          X1 Date / Time        City       State       Shape    Duration 
-##   &quot;integer&quot; &quot;character&quot; &quot;character&quot; &quot;character&quot; &quot;character&quot;   &quot;numeric&quot; 
-##     Summary      Posted        year       month        Desc        Date 
-## &quot;character&quot;      &quot;Date&quot;   &quot;integer&quot; &quot;character&quot; &quot;character&quot;      &quot;Date&quot; 
-##        Time      In_USA     Country        Hoax      Shape1      Shape2 
-## &quot;character&quot;   &quot;logical&quot; &quot;character&quot;   &quot;logical&quot; &quot;character&quot; &quot;character&quot; 
-##      Shape3 
-## &quot;character&quot;</code></pre>
-<pre class="r"><code>write.csv(ufo, file = &quot;data/ufo_clean.csv&quot;)</code></pre>
-<pre class="r"><code>ufo_clean &lt;- as_tibble(read_csv(&quot;data/ufo_clean.csv&quot;))
+<pre><code>##                X1       Date / Time              City             State 
+##         &quot;integer&quot;       &quot;character&quot;       &quot;character&quot;       &quot;character&quot; 
+##             Shape          Duration           Summary            Posted 
+##       &quot;character&quot;         &quot;numeric&quot;       &quot;character&quot;            &quot;Date&quot; 
+##              year             month              Desc              Date 
+##         &quot;integer&quot;       &quot;character&quot;       &quot;character&quot;            &quot;Date&quot; 
+##              Time            In_USA           Country              Hoax 
+##       &quot;character&quot;         &quot;logical&quot;       &quot;character&quot;         &quot;logical&quot; 
+##            Shape1            Shape2            Shape3 DescriptionLength 
+##       &quot;character&quot;       &quot;character&quot;       &quot;character&quot;         &quot;numeric&quot;</code></pre>
+<pre class="r"><code>write.csv(ufo, file = &quot;data/ufo_clean_final.csv&quot;)</code></pre>
+<pre class="r"><code>ufo_clean &lt;- as_tibble(read_csv(&quot;data/ufo_clean_final.csv&quot;))
 summary(ufo_clean)</code></pre>
 <pre><code>##        X1              X1_1        Date / Time            City          
 ##  Min.   :     1   Min.   :   0.0   Length:114838      Length:114838     
@@ -870,13 +872,13 @@ summary(ufo_clean)</code></pre>
 ##                                                                          
 ##                                                                          
 ##                                                                          
-##     Shape3         
-##  Length:114838     
-##  Class :character  
-##  Mode  :character  
-##                    
-##                    
-##                    
+##     Shape3          DescriptionLength
+##  Length:114838      Min.   :    2.0  
+##  Class :character   1st Qu.:   86.0  
+##  Mode  :character   Median :  149.0  
+##                     Mean   :  199.5  
+##                     3rd Qu.:  246.0  
+##                     Max.   :11687.0  
 ## </code></pre>
 <p>At this point, we have a clean dataset and are ready to proceed with analysis. EDA material can be found in <code>part4_eda.rmd</code></p>
 </div>
