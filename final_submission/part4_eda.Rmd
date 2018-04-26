@@ -158,7 +158,7 @@ Most of the sightings in the dataset are fairly short (between seconds and 5 min
 
 ```{r duration-bar-graph}
 ggplot(ufo, aes(x = Bin_Dur)) + geom_bar(fill='darkcyan') + labs(x = "Duration in Minutes", y = "Number of Sightings") +
-  ggtitle("Sighting Frequency by Duration") + scale_y_continuous(name='count (thousands)', labels = c(10,20,30),breaks = c(10000,20000,30000)) + theme_light()
+  ggtitle("Sighting Frequency by Duration") + scale_y_continuous(name='Sightings (thousands)', labels = c(10,20,30),breaks = c(10000,20000,30000)) + theme_light()
 ```
 
 Zooming in to the sightings less than one hour, we can make a few observations. 
@@ -183,7 +183,7 @@ durshape$prop <- durshape$durshapefreq/durshape$durfreq
 ggplot(durshape, aes(x = Shape2, y = prop, fill = Shape2)) +
   geom_bar(stat = "identity") + facet_wrap(~Bin_Dur) +
   ggtitle("Shape Proportion Across Durations") +
-  xlab("Duration in Minutes") + scale_fill_manual(values=cbPalette, name = "Shape") + ylab("Proportion of Sightings by Duration Length")+ theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme_light()
+  xlab("Duration in Minutes") + scale_fill_manual(values=cbPalette, name = "Shape") + ylab("Proportion of Sightings")+ theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme_light()
 ```
 
 
@@ -197,7 +197,7 @@ ggplot(ufo, aes(as.POSIXct(Time))) +
   # scale_x_datetime(breaks = date_breaks("1 hour"))
   scale_x_datetime(breaks = date_breaks("2 hour"), labels = date_format("%H:%M")) + 
   xlab("Time of Day") + 
-  scale_fill_viridis(name = "Frequency") + theme_light()+ scale_y_continuous(name='count (thousands)', labels = c(2,4,6,8,10,12,14),breaks = c(2000,4000,6000,8000,10000,12000,14000))
+  scale_fill_viridis(name = "Frequency") + theme_light()+ scale_y_continuous(name='Sightings (thousands)', labels = c(2,4,6,8,10,12,14),breaks = c(2000,4000,6000,8000,10000,12000,14000))
 
 ```
 
@@ -209,7 +209,7 @@ ggplot(ufo, aes(month)) +
   scale_fill_viridis(discrete = TRUE, name = "Month", labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December")) +
   ggtitle("UFO Sighting Frequency By Month") +
   labs(y = "Number of Observations", x = "Month")+ scale_x_discrete(
-        labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December")) + theme_light() + scale_y_continuous(name='count (thousands)', labels = c(2,4,6,8,10,12),breaks = seq(2000,12000,2000)) + theme(axis.text.x=element_text(angle=30,hjust=1)) 
+        labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December")) + theme_light() + scale_y_continuous(name='Sightings (thousands)', labels = c(2,4,6,8,10,12),breaks = seq(2000,12000,2000)) + theme(axis.text.x=element_text(angle=30,hjust=1)) 
 ```
 
 Now lets focus on the 'description' field. This field is rightfully free form, and allows us to do some text-based analysis. First, we will look at how descriptive the reports are and if there are any other features that entice reporters to provide longer descriptions. Later (see part67.rmd) we consider the word frequency and two-word affinity within comments.
@@ -222,7 +222,7 @@ ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
 ggplot(ufoShortDescription, aes(DescriptionLength)) +
   geom_histogram(bins=70, color="black", fill="firebrick3") +
   ggtitle("UFO Sighting Description Word Count by time of Day and Shape") +
-  labs(y = "Frequency", x = "Word Count") + scale_fill_viridis(name = "Frequency") + scale_y_continuous(name = "Count (thousands)", breaks = seq(2000,8000,2000), labels = seq(2,8,2)) + theme_light() + scale_x_continuous(name = "Word count", breaks = seq(0,1000,100), labels = seq(0,1000,100))
+  labs(y = "Frequency", x = "Word Count") + scale_fill_viridis(name = "Frequency") + scale_y_continuous(name = "Sightings (thousands)", breaks = seq(2000,8000,2000), labels = seq(2,8,2)) + theme_light() + scale_x_continuous(name = "Word count", breaks = seq(0,1000,100), labels = seq(0,1000,100))
 
 ```
 
@@ -231,7 +231,7 @@ We considered whether observing certain shapes would encourage a longer descript
 ```{r time_by_word_count, echo = FALSE}
 ggplot(ufoShortDescription, aes(x=as.POSIXct(Time), y=DescriptionLength)) +
   geom_point(alpha=0.2, aes(color = Shape2)) +
-  ggtitle("UFO Sighting Time By Comment Word Count") +
+  ggtitle("Word Count by time of Day and Shape") +
   labs(y = "Word Count", x = "Time")  +
   guides(colour = guide_legend(override.aes = list(alpha = 1))) + 
   scale_color_manual(values=cbPalette, name = "Shape") + 
