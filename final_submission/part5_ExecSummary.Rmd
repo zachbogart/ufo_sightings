@@ -1,0 +1,191 @@
+---
+title: "Executive Summary"
+author: "Robert Davis DeRodes, Josh Feldman, Zach Bogart, Ramy Jaber"
+date: "4/26/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, echo = FALSE}
+# knitr::opts_chunk$set(echo = FALSE, eval = FALSE)
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE, 
+                      cache = TRUE)
+
+library(Sleuth3)
+library(tidyverse)
+library(viridis)
+library(DAAG)
+
+library(vcd)
+library(ggthemes)
+library(ggplot2)
+library(extracat)
+library(scales)
+library(micromapST)
+library(statebins)
+library(lubridate)
+library(scales)
+```
+
+```{r add-data, warning=FALSE, echo = FALSE}
+
+ufo <- as_tibble(read_csv("data/ufo_clean.csv"))
+ufo <- ufo %>% select(-X1)
+
+state_pops <- as_tibble(read_csv("data/StatePops.csv"))
+excer <- as_tibble(read.csv("data/Excercise.csv"))
+colnames(excer)[2] <- "Excercise"
+
+trump_state <- as_tibble(read_csv("data/TrumpState.csv"))
+
+obese <- as_tibble(read_csv("data/Obesity.csv"))
+
+ufo <- ufo %>%
+  mutate(Shape2 = fct_relevel(Shape2, "Circle", "Light", "Triangle", "Rectangle", "Other"))
+USA_ufo <- ufo %>% filter(In_USA == TRUE & is.na(Shape2) == FALSE)
+USA_ufo_merged <- merge(USA_ufo, state_pops, by = "State")
+
+```
+
+```{r duration-binning-custom, echo = FALSE}
+bin_duration <- function(duration){
+  
+  if(is.na(duration) == TRUE){
+    return(NA)
+  }
+  
+  if(duration < 60){
+    return("< 1")
+  }
+  else if(duration < 300){
+    return("1 - 5")
+    
+  }
+  else if(duration < 600){
+    
+    return("5 - 10")
+  }
+  
+  else if(duration < 1800){
+    return("10 - 30")
+  }
+  
+  else if (duration < 3600){
+    return("30 - 60")
+  }
+  else{
+    return("60+")
+  }
+  return(NA)
+  
+}
+
+```
+
+
+
+```{r format-data-for-plotting, echo = FALSE}
+ufo <- ufo %>% filter(Hoax == FALSE)
+ufo <- ufo %>% mutate(`Bin_Dur` = lapply(ufo$Duration, bin_duration))
+
+ufo$Bin_Dur <- unlist(ufo$Bin_Dur)
+ufo <- ufo %>%
+  mutate(Bin_Dur = fct_relevel(Bin_Dur, "< 1", "1 - 5", "5 - 10", "10 - 30", "30 - 60", "60+"))
+temp4 <- ufo %>% filter(is.na(Shape2) == FALSE)
+durshape <- temp4 %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(Bin_Dur, Shape2) %>% summarize(durshapefreq = n())
+temp <- ufo %>% filter(year >= 1995 & year != 2018 & is.na(Bin_Dur) == FALSE) %>% group_by(Bin_Dur) %>% summarize(durfreq = n())
+durshape <- merge(durshape, temp, by="Bin_Dur")
+durshape$prop <- durshape$durshapefreq/durshape$durfreq
+cbPalette <- c("#56B4E9", "#F0E442", "#E69F00", "#009E73", "#CC79A7", "#0072B2", "#D55E00", "#999999")
+
+```
+
+Our project involved scraping sighting reports from nuforc.org, the website of the National UFO Reporting Center. The National UFO Reporting Center was founded in 1974 in Seattle Washington, where it took in UFO sighting reports through phone calls. The NUFORC would grow and develop a website in October of 1998 and create an intake webpage for sighting reports, while also moving it's headquarters to Davenport, Oregon. 
+
+While our goal of the project was to identify patterns in UFO sightings to possibly provide evidence of certain types of UFOs, our conclusions were mostly centered around the NUFORC and the underlying reasons as to why someone would see a UFO in the first place. For example, all of the background information about the NUFORC mentioned above was deduced solely from the data and then later confirmed by talking to the organization's director. 
+
+We can clearly see that there is a large proliferation in sightings from November of 1998, almost certainly due to the addition of the website to the NUFORC's intake tools. 
+
+```{r freq_plot, echo = FALSE}
+ufo1950 <- ufo %>% filter(year>=1950)
+ggplot(ufo1950, aes(x = year)) + geom_bar(fill='dodgerblue') +
+  ggtitle("Sighting Frequency (1950-2018)") + theme_light() + scale_y_continuous(name = "Sightings (thousands)", breaks = c(2000,4000,6000,8000), labels = c(2,4,6,8)) + xlab("Year") 
+                                                                                                                                                    
+```
+
+
+The graph below shows one of our more interesting findings, that there has been a steady decline of the proportionality of sightings that are reported as circles since 1950. The proportion of circles goes from 92% of all sightings in 1951, to it's 2017 value of 35% of all sightings. On the other hand, light oriented sightings have had a fairly substantial increase with only 8% of all sightings in 1950 being lights, while in 2017 30% of all sights are described as light. We have two possible theories for these trends. First, confounding UFOs such as missles and stealth bombers became much more prevalent in the 2000's and usually are either classified as Lights or Triangle. Second, saucer-like UFO's since the mid 90's have become less a part of our "Alien" culture due to films such as Star Wars (1977), Star Trek (1966), and Alien (1979). 
+
+
+```{r, echo = FALSE}
+
+temp2 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
+temp2 <- merge(ufo, temp2, by = "year")
+shape_overtime <- temp2 %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year, Shape2, yearfreq) %>% summarize(freq = n()) %>% mutate(`Prop` = freq/yearfreq)
+ggplot(shape_overtime, aes(year, Prop, color = Shape2)) + geom_line() +
+    ggtitle("Saucers Become Out of Style") +
+    labs (x = "Year", y = "Proportion of Sightings") +  scale_color_manual(values=cbPalette, name = "Shape")+ scale_y_continuous(labels = percent) 
+```
+
+
+The graph below shows a fairly obvious finding that light oriented objects tend to be appear more frequently at night, while circles tend to be a larger proportion of the sightings during the day. As you can also see, this is the dominating pattern and ther are no other patterns (ie: Triangles come more frequently at night). 
+
+```{r time_by_word_count, echo = FALSE}
+ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
+ufoShortDescription2 <- ufoShortDescription %>% filter(is.na(Shape2) == FALSE)
+ggplot(ufoShortDescription2, aes(x=as.POSIXct(Time), y=DescriptionLength)) +
+  geom_point(alpha=0.2, aes(color = Shape2)) +
+  ggtitle("Word Count by time of Day and Shape") +
+  labs(y = "Word Count", x = "Time")  +
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) + 
+  scale_color_manual(values=cbPalette, name = "Shape") + 
+  scale_x_datetime(breaks = date_breaks("2 hour"), labels = date_format("%H:%M")) 
+```
+
+Another question of intrigue for our project was whether or not sighitngs occur in different areas of the United States. Given the folklore of UFOs, we were expecting UFOs to be most common in midwestern states with corn fields or Arizona and New Mexico - the fabled location of Area 51. While there might be some support for alien interest in the southwest United States, the states with the largest amount of sightings per 10,000 residents were Vermont, Washington, Montana, Alaska, Maine, and Oregon. Washington and Oregon make complete sense as those were the states the NUFORC was headquarted in when it did not have an online presence and did most of it's marketing locally. The peculiar states that are so popular are Alaska, Vermont, and Maine as they are not local to the Pacific Northwest. This leads us to believe that one of the largest driving factors for the location of UFO sightings is how much time do the people in those states spend outside. 
+
+```{r state-map-sightings, echo = FALSE}
+USA_ufo <- merge(USA_ufo, state_pops, by = "State")
+shape_prop<- USA_ufo %>% filter(year >= 1995) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+shape_prop$state <- shape_prop$State
+statebins(shape_prop, value_col = "Prop", text_color =  "black", font_size = 3, legend_title = "Sightings Per 10,000 Residents", legend_position =  "bottom") + labs(title = "The Pacific Northwest is More Extraterrestrial")
+
+```
+
+Confirming this assumption, the graph below clearly shows that UFO sightings are most popular in summer months, when people are outside most frequently. 
+
+```{r freq_by_month, echo=FALSE}
+ufoAmerica <- ufo %>% filter(is.na(In_USA) == FALSE && In_USA == TRUE)
+ggplot(ufo, aes(month)) +
+  geom_bar(bins=12, color="black", fill="springgreen3") + 
+  scale_fill_viridis(discrete = TRUE, name = "Month", labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December")) +
+  ggtitle("UFO Sighting Frequency By Month") +
+  labs(y = "Number of Observations", x = "Month")+ scale_x_discrete(
+        labels=c("01" = "January","02" =  "February", "03" ="March", "04" ="April", "05" = "May", "06" = "June", "07" = "July","08" = "August", "09" ="September", "10" = "October", "11" = "November","12" = "December")) + theme_light() + scale_y_continuous(name='Number of Sightings (thousands)', labels = c(2,4,6,8,10,12),breaks = seq(2000,12000,2000)) + theme(axis.text.x=element_text(angle=30,hjust=1)) 
+```
+
+At the state level, we were able to use 3 proxy variables to show the relationship between states and going outside. The first two graphs here use data from the American Time Use Survey (ATUS), conducted by the Bureau of Labor Statistics, conducted from 2009-2015. As one can see below, there is a positive trend between both percentage of the population engaged in sports and excercise on a given day and percentage of the population and average number of minutes a day spent excersing. A similar variable that is a proxy for time spent outside is obesity rates by state. The third graph below shows a strong negative correlation between state obesity rate and the number of sightings per 10,000 residents. Because these 3 proxy variables produce similar results, we find that there is a certain robustness to our claim that being outdoors is one of the dominant factors for sightings in states. 
+
+```{r, echo = FALSE}
+library(ggrepel)
+
+USA_ufo_summary2 <- USA_ufo_merged %>% filter(year >= 2009) %>% group_by(State, Population) %>% summarise(freq = n()) %>% mutate(`Prop` = 10000*freq/Population)
+USA_ufo_summary2 <- merge(USA_ufo_summary2, excer, by = "State")
+ggplot(USA_ufo_summary2, aes(x = Excercise, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of population engaged in sports and exercise on an average day", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x) + theme_light() + ggtitle("Sightings by Population engaged in Sports/Exercise (2009 - Present)")
+
+
+ 
+
+ggplot(USA_ufo_summary2, aes(x = ATUS, y = Prop)) + geom_point(stat = "identity") + labs(x = "Minutes a day spent doing Sports, Excercise, Recreation", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State)+ geom_smooth(method='lm',formula=y~x) + theme_light() + scale_x_continuous(breaks = seq(0,.7,.1),labels = seq(0,42,6)) +
+ggtitle("Sightings by Exercise (2009 - Present)") 
+
+USA_ufo_summary2 <- merge(USA_ufo_summary2, obese, by = "State")
+ggplot(USA_ufo_summary2, aes(x = Obesity, y = Prop)) + geom_point(stat = "identity") + labs(x = "Percentage of Obese Adults", y = "Sightings per 10,000 Residents") + geom_text_repel(label=USA_ufo_summary2$State) + geom_smooth(method='lm',formula=y~x) + theme_light() + ggtitle("Sightings Correlated with Obesity (2009 - Present)")
+
+
+```
+
+Given our results from our analysis, we did not find the relationships between the features in our data that we had hoped. We find it most likely that the relationships found in this data are caused by terresterial forces such as making a website, local marketing, and the effects of alien portrayal in pop culture. After contacting Dr. Davenport, the director of the NUFORC, he told us that work has been done that has found the relationships we tried to find, but it required identifying incorrect sightings caused by missles. This could possibly be future work, but the trends that are seen in this project are clearly results of subjective human reporting.  
+
