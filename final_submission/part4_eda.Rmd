@@ -87,7 +87,7 @@ ggplot(percent_missing, aes(x=Shape1, y=percent_na)) +
 ### Review Sightings by State
 
 Here we split the duration into discrete bins to make future plotting easier
-```{r duration-binning-custom, echo=FALSE}
+```{r duration-binning-custom}
 USA_ufo <- ufo %>% filter(In_USA == TRUE & is.na(Shape2) == FALSE)
 bin_duration <- function(duration){
   
@@ -188,7 +188,7 @@ ggplot(durshape, aes(x = Shape2, y = prop, fill = Shape2)) +
 
 As expected, the majority of UFO sighting happen between 6pm and midnight. Late enough that it's dark, but early enough that people haven't gone to sleep yet. We choose to use 24 bins (one for each hour of the day) to smooth the effects of rounding in the trend. We can also notice a bump at 12noon, indicating typical lunch break when people are more inclined to be outside. 
 
-```{r freq_over_time, echo = FALSE}
+```{r freq_over_time}
 ggplot(ufo, aes(as.POSIXct(Time))) +
   geom_histogram(bins=24, color="black", fill="springgreen3") +
   ggtitle("UFO Sighting Frequency Over Time") +
@@ -216,7 +216,7 @@ Now lets focus on the 'description' field. This field is rightfully free form, a
 
 We can see that descriptions tend to be 200 words or less with a mean around 100 words, but there is a significant percentage of descriptions that exceed 400 words.
 
-```{r freq_by_word_count, echo = FALSE}
+```{r freq_by_word_count}
 
 ufoShortDescription <- filter(ufo, DescriptionLength < 1000)
 
@@ -229,7 +229,7 @@ ggplot(ufoShortDescription, aes(DescriptionLength)) +
 
 We considered whether observing certain shapes would encourage a longer description. When looking for this trend, we actually uncovered a separate, but equally interesting one. During the daylight hour observations, there is a clear drop off of "light" observations. This seems obvious due to lighted objects being more difficult to spot during daytime. This trend can be seen as the color gradient changes over time in the scatter plot below. At night, as we saw earlier, there is an increased frequency of reports, and the distribution of shapes is more unifrom. 
 
-```{r time_by_word_count, echo = FALSE}
+```{r time_by_word_count}
 ggplot(ufoShortDescription, aes(x=as.POSIXct(Time), y=DescriptionLength)) +
   geom_point(alpha=0.2, aes(color = Shape2)) +
   ggtitle("Word Count by time of Day and Shape") +
@@ -349,7 +349,7 @@ ggplot(ufo1950, aes(x = year, fill = Bin_Dur)) + geom_bar(position = "fill") + s
 
 This graph exemplifies how the proportion of durations varies wildly before 1995, but after 1995 the proportion of durations of observations became less variable. 
 
-```{r, echo = FALSE}
+```{r}
 
 temp2 <- ufo %>% filter(year >= 1950 & year != 2018 & is.na(Shape2) == FALSE) %>% group_by(year) %>% summarize(yearfreq = n())
 temp2 <- merge(ufo, temp2, by = "year")
